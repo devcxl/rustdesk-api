@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/rustdesk-api
+
+jobs:
+  # 原生构建产物：四平台打包并上传到 GitHub Release
+  build:
+    name: Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { platform: "amd64", goos: "linux", file_ext: "tar.gz" }
+          - { platform: "arm64", goos: "linux", file_ext: "tar.gz" }
+          - { platform: "armv7l", goos: "linux", file_ext: "tar.gz" }
+          - { platform: "amd64", goos: "windows", file_ext: "zip" }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build for ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+        run: |
+          mkdir release -p
+          cp -ar resources release/
+          cp -ar docs release/
+          cp -ar conf release/
+          mkdir -p release/data
+          mkdir -p release/runtime
+          if [ "${{ matrix.job.goos }}" = "windows" ]; then
+            sudo apt-get install gcc-mingw-w64-x86-64 zip -y
+            GOOS=${{ matrix.job.goos }} GOARCH=${{ matrix.job.platform }} CC=x86_64-w64-mingw32-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain.exe ./cmd/apimain.go
+            echo @echo off > release/start.bat
+            echo cmd /c \"%~dp0apimain.exe\" >> release/start.bat
+            zip -r ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}} ./release
+          else
+            if [ "${{ matrix.job.platform }}" = "arm64" ]; then
+                wget https://musl.ljw.red/aarch64-linux-musl-cross.tgz
+                tar -xf aarch64-linux-musl-cross.tgz
+                export PATH=$PATH:$PWD/aarch64-linux-musl-cross/bin
+                GOOS=${{ matrix.job.goos }} GOARCH=${{ matrix.job.platform }} CC=aarch64-linux-musl-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain ./cmd/apimain.go
+            elif [ "${{ matrix.job.platform }}" = "armv7l" ]; then
+                wget https://musl.ljw.red/armv7l-linux-musleabihf-cross.tgz
+                tar -xf armv7l-linux-musleabihf-cross.tgz
+                export PATH=$PATH:$PWD/armv7l-linux-musleabihf-cross/bin
+                GOOS=${{ matrix.job.goos }} GOARCH=arm GOARM=7 CC=armv7l-linux-musleabihf-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain ./cmd/apimain.go
+            else
+              sudo apt-get install musl musl-dev musl-tools -y
+              GOOS=${{ matrix.job.goos }} GOARCH=${{ matrix.job.platform }} CC=musl-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain ./cmd/apimain.go
+            fi
+            tar -czf ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}} ./release
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-api-${{ matrix.job.goos }}-${{ matrix.job.platform }}
+          path: |
+            ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Docker 多架构镜像：复用 linux 构建产物，一次构建多架构 manifest 推送到 GHCR
+  docker:
+    name: Docker multi-arch image to GHCR
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binaries (amd64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rustdesk-api-linux-amd64
+          path: .
+
+      - name: Download binaries (arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: rustdesk-api-linux-arm64
+          path: .
+
+      - name: Download binaries (armv7l)
+        uses: actions/download-artifact@v4
+        with:
+          name: rustdesk-api-linux-armv7l
+          path: .
+
+      - name: Extract binaries
+        run: |
+          for p in amd64 arm64 armv7l; do
+            mkdir -p $p
+            tar -xzf linux-$p.tar.gz -C $p
+          done
+
+      - name: Get tag version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "TAG=test" >> $GITHUB_ENV
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: "."
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:latest

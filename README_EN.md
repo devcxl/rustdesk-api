@@ -138,10 +138,7 @@ displaying data.Frontend code is available at [rustdesk-api-web](https://github.
 ./apimain -h
 ```
 
-#### Reset admin password
-```bash
-./apimain reset-admin-pwd <pwd>
-```
+> Note: The `reset-admin-pwd` / `reset-pwd` commands have been removed along with password login. Use the `github-oauth.admins` config to bootstrap admins.
 
 ## Installation and Setup
 

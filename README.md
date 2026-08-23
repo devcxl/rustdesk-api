@@ -121,9 +121,17 @@ github-oauth:
 
 对应环境变量：`RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE`、`RUSTDESK_API_GITHUBOAUTH_ORGS`、`RUSTDESK_API_GITHUBOAUTH_USERS`
 
-3. （可选）配合 `app.disable-pwd-login: true` 禁用密码登录，仅保留 GitHub 登录入口。
+3. 配置管理员引导（密码登录已移除，需通过 GitHub 账号授予管理员）：
+
+```yaml
+github-oauth:
+  admins: "your-github-name"  # 登录后自动授予管理员的 GitHub 账号
+```
+
+对应环境变量：`RUSTDESK_API_GITHUBOAUTH_ADMINS`
 
 行为说明：
+- **传统用户名/密码登录已完全移除**（客户端 `/api/login` 与后台 `/api/admin/login` 均已删除），登录仅支持 GitHub OAuth2/webauth；
 - 启用限制后，GitHub 授权回调时会校验：命中 `users` 白名单，或为任一 `orgs` 的有效成员(active)；否则拒绝登录/注册/绑定，页面提示“该 GitHub 账号无权登录”；
 - 校验使用用户自己的授权 token 调用 `GET /user/memberships/orgs/{org}`，无需额外权限；
 - GitHub API 异常时按拒绝处理（fail-closed），不会放大权限；
@@ -165,10 +173,7 @@ github-oauth:
 ./apimain -h
 ```
 
-#### 重置管理员密码
-```bash
-./apimain reset-admin-pwd <pwd>
-```
+> 注：原 `reset-admin-pwd` / `reset-pwd` 命令已随密码登录一并移除，管理员请通过 `github-oauth.admins` 配置引导。
 
 ## 安装与运行
 

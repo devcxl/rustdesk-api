@@ -7,7 +7,7 @@
 ### 1.1 现有登录方式
 | 方式 | 入口 | 说明 |
 |------|------|------|
-| 账号密码 | `POST /api/login`、`POST /api/admin/login` | 本地 DB + 可选 LDAP，支持 `disable-pwd-login` 全局关闭 |
+| 账号密码 | ~~`POST /api/login`、`POST /api/admin/login`~~ | **已移除**（v2 后续版本），登录仅剩 OAuth/webauth |
 | OAuth（github/google/oidc/linuxdo） | `POST /api/oidc/auth` → `/api/oidc/callback` | provider 信息存 DB（Web 后台「Oauth 管理」维护 client_id/secret），github 类型已实现 |
 | Web 授权（webauth） | 后台审批 | `web-sso: true` 时客户端可经后台授权登录 |
 
@@ -53,7 +53,7 @@ github-oauth:
 
 - 结构体：`config.GithubOauth{RestrictEnable bool; Orgs string; Users string}`
 - 环境变量覆盖：`RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE` 等（viper replacer `.`/`-` → `_`）
-- 收敛登录方式的配套开关沿用现状：`app.disable-pwd-login: true` + 仅保留 github 一个 Oauth provider
+- 收敛登录方式：密码登录已直接移除；管理员通过 `github-oauth.admins` 配置引导
 
 ## 5. 任务拆解（DAG）
 

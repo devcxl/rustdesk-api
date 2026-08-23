@@ -109,7 +109,25 @@
 
 可以将登录方式收敛为 GitHub OAuth2，并通过配置限定**指定个人账号**或**指定组织的成员**才可登录使用。
 
-1. 在后台「Oauth 管理」创建 Github 类型的 provider，填入 client-id / client-secret；
+1. 配置 GitHub OAuth App 凭据（环境变量即可，启动时自动种入数据库，**无需先登录后台**）：
+
+```yaml
+# docker-compose 示例
+services:
+  rustdesk-api:
+    image: ghcr.io/devcxl/rustdesk-api:latest
+    environment:
+      RUSTDESK_API_GITHUB_OAUTH_CLIENT_ID: "你的ClientID"        # OAuth App 凭据，新部署引导必填
+      RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET: "你的Secret"
+      RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE: "true"
+      RUSTDESK_API_GITHUB_OAUTH_ORGS: "acme-org"
+      RUSTDESK_API_GITHUB_OAUTH_USERS: "alice,bob"
+      RUSTDESK_API_GITHUB_OAUTH_ADMINS: "your-github-name"
+```
+
+> GitHub OAuth App 在 Settings → Developer settings → OAuth Apps 创建，
+> Authorization callback URL 填 `http://<server>:21114/api/oidc/callback`
+
 2. 配置白名单（`conf/config.yaml` 或环境变量）：
 
 ```yaml
@@ -200,9 +218,12 @@ github-oauth:
 | RUSTDESK_API_APP_REGISTER_STATUS                       | 注册用户默认状态; 1 启用，2 禁用, 默认 1                                                      | `1`                          |
 | RUSTDESK_API_APP_CAPTCHA_THRESHOLD                     | 验证码触发次数; -1 不启用， 0 一直启用， >0 登录错误次数后启用 ;默认 `3`                                  | `3`                          |
 | RUSTDESK_API_APP_BAN_THRESHOLD                         | 封禁IP触发次数; 0 不启用, >0 登录错误次数后封禁IP; 默认 `0`                                        | `0`                          |
-| RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE                | 是否启用 GitHub 登录白名单限制; 默认 `false`                                                | `true`                       |
+| RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE             | 是否启用 GitHub 登录白名单限制; 默认 `false`                                                | `true`                       |
 | RUSTDESK_API_GITHUB_OAUTH_ORGS                          | 允许的组织，逗号分隔                                                                     | `acme-org`                   |
 | RUSTDESK_API_GITHUB_OAUTH_USERS                         | 允许的个人账号，逗号分隔                                                                   | `alice,bob`                  |
+| RUSTDESK_API_GITHUB_OAUTH_ADMINS                         | 登录后自动授予管理员的账号，逗号分隔                                                              | `your-github-name`           |
+| RUSTDESK_API_GITHUB_OAUTH_CLIENT_ID                      | GitHub OAuth App Client ID（启动时种入数据库）                                                   | ``                           |
+| RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET                  | GitHub OAuth App Client Secret（同上）                                                      | ``                           |
 | -----ADMIN配置-----                                      | ----------                                                                     | ----------                   |
 | RUSTDESK_API_ADMIN_TITLE                               | 后台标题                                                                           | `RustDesk Api Admin`         |
 | RUSTDESK_API_ADMIN_HELLO                               | 后台欢迎语，可以使用`html`                                                               |                              |

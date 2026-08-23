@@ -38,6 +38,8 @@ type GithubOauthAccess struct {
 	Orgs           string `mapstructure:"orgs"`            // 允许的组织, 逗号分隔, 如 "acme-org,subsidiary"
 	Users          string `mapstructure:"users"`           // 允许的个人 GitHub 登录名, 逗号分隔
 	Admins         string `mapstructure:"admins"`          // 登录后自动授予管理员的 GitHub 登录名, 逗号分隔
+	ClientId       string `mapstructure:"client-id"`       // GitHub OAuth App 凭据, 启动时自动种入数据库(解决新部署无登录入口的引导问题)
+	ClientSecret   string `mapstructure:"client-secret"`   // 同上
 }
 type Config struct {
 	Lang        string `mapstructure:"lang"`

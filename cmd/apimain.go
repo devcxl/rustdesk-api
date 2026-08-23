@@ -158,6 +158,10 @@ func InitGlobal() {
 	})
 	global.LoginLimiter.RegisterProvider(utils.B64StringCaptchaProvider{})
 	DatabaseAutoUpdate()
+	// 将配置中的 GitHub OAuth 凭据种入数据库，保证新部署有登录入口
+	if err := service.AllService.OauthService.SeedGithubOauth(); err != nil {
+		global.Logger.Error("seed github oauth failed: ", err)
+	}
 }
 
 func DatabaseAutoUpdate() {

@@ -546,6 +546,43 @@ func (os *OauthService) Update(oauthInfo *model.Oauth) error {
 	return DB.Model(oauthInfo).Updates(oauthInfo).Error
 }
 
+// SeedGithubOauth 将配置(github-oauth.client-id/client-secret)中的 GitHub OAuth App 凭据
+// 同步到数据库(op=github)：不存在则创建(auto_register=true)，已存在且凭据变化则更新。
+// 用于密码登录移除后的引导：新实例无需登录后台即可让前端出现 GitHub 登录入口。
+func (os *OauthService) SeedGithubOauth() error {
+	c := Config.GithubOauth
+	if c.ClientId == "" || c.ClientSecret == "" {
+		return nil
+	}
+	oauthInfo := os.InfoByOp(model.OauthTypeGithub)
+	if oauthInfo.Id == 0 {
+		autoRegister := true
+		oauthInfo = &model.Oauth{
+			Op:           model.OauthTypeGithub,
+			OauthType:    model.OauthTypeGithub,
+			ClientId:     c.ClientId,
+			ClientSecret: c.ClientSecret,
+			AutoRegister: &autoRegister,
+		}
+		if err := os.Create(oauthInfo); err != nil {
+			return err
+		}
+		if Logger != nil {
+			Logger.Info("github oauth provider seeded from config")
+		}
+	} else if oauthInfo.ClientId != c.ClientId || oauthInfo.ClientSecret != c.ClientSecret {
+		oauthInfo.ClientId = c.ClientId
+		oauthInfo.ClientSecret = c.ClientSecret
+		if err := os.Update(oauthInfo); err != nil {
+			return err
+		}
+		if Logger != nil {
+			Logger.Info("github oauth provider credentials updated from config")
+		}
+	}
+	return nil
+}
+
 // GetOauthProviders 获取所有的provider
 func (os *OauthService) GetOauthProviders() []string {
 	var res []string

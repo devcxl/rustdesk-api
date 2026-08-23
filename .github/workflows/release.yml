@@ -35,6 +35,29 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Set up npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get tag version
+        run: |
+          TAG_VERSION="${GITHUB_REF##*/}"
+          VERSION="${TAG_VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build rustdesk-api-web (admin frontend)
+        run: |
+          git clone --depth 1 https://github.com/lejianwen/rustdesk-api-web.git rustdesk-api-web
+          cd rustdesk-api-web
+          npm install
+          npm run build
+          mkdir -p ../resources/admin/
+          cp -ar dist/* ../resources/admin/
+
+      - name: Write version to resources/version
+        run: echo $VERSION > resources/version
+
       - name: Build for ${{ matrix.job.goos }}-${{ matrix.job.platform }}
         run: |
           mkdir release -p

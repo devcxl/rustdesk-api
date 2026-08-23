@@ -106,3 +106,22 @@ func TestCheckGithubAccessFailClosedOnServerError(t *testing.T) {
 		t.Fatal("should deny when github api unreachable (fail-closed)")
 	}
 }
+
+func TestIsAdminListed(t *testing.T) {
+	cases := []struct {
+		csv, login string
+		want       bool
+	}{
+		{"alice,bob", "alice", true},
+		{"alice,bob", "ALICE", true}, // 大小写不敏感
+		{" alice , bob ", "bob", true},
+		{"alice", "mallory", false},
+		{"", "alice", false},
+		{"  ", "alice", false},
+	}
+	for _, c := range cases {
+		if got := isAdminListed(c.csv, c.login); got != c.want {
+			t.Errorf("isAdminListed(%q, %q) = %v, want %v", c.csv, c.login, got, c.want)
+		}
+	}
+}

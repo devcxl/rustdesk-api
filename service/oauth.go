@@ -333,6 +333,16 @@ func splitCsv(s string) []string {
 	return res
 }
 
+// isAdminListed 判断 GitHub 登录名是否命中 admins 白名单（大小写不敏感）
+func isAdminListed(adminsCsv, login string) bool {
+	for _, a := range splitCsv(adminsCsv) {
+		if strings.EqualFold(a, login) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkGithubAccess 校验 GitHub 用户是否允许登录。
 // 未启用限制(restrict-enable=false)时直接放行；
 // 启用后仅允许 users 白名单中的账号或 orgs 中任一组织的有效成员(active)，

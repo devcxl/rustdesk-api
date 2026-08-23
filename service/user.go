@@ -270,6 +270,30 @@ func (us *UserService) IsAdmin(u *model.User) bool {
 	return u != nil && *u.IsAdmin
 }
 
+// EnsureGithubAdmin 密码登录移除后的管理员引导：
+// 若 op 为 github 且 GitHub 登录名命中配置 github-oauth.admins，
+// 则将该用户提升为管理员（已管理员则无操作）。其余情况原样返回。
+func (us *UserService) EnsureGithubAdmin(op, githubLogin string, u *model.User) *model.User {
+	if op != model.OauthTypeGithub || u == nil || u.Id == 0 || us.IsAdmin(u) {
+		return u
+	}
+	if !isAdminListed(Config.GithubOauth.Admins, githubLogin) {
+		return u
+	}
+	if err := DB.Model(u).Update("is_admin", true).Error; err != nil {
+		if Logger != nil {
+			Logger.Warnf("grant admin to github user %s failed: %v", githubLogin, err)
+		}
+		return u
+	}
+	isAdmin := true
+	u.IsAdmin = &isAdmin
+	if Logger != nil {
+		Logger.Infof("github user %s granted admin by config", githubLogin)
+	}
+	return u
+}
+
 // RouteNames
 func (us *UserService) RouteNames(u *model.User) []string {
 	if us.IsAdmin(u) {

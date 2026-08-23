@@ -85,3 +85,4 @@ github-oauth:
   restrict-enable: false # 是否启用 GitHub OAuth2 登录白名单限制
   orgs: ""               # 允许的组织，逗号分隔，如 "acme-org,subsidiary"
   users: ""              # 允许的个人 GitHub 登录名，逗号分隔，如 "alice,bob"
+  admins: ""             # 登录后自动授予管理员的 GitHub 登录名，逗号分隔

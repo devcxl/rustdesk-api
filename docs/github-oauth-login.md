@@ -52,7 +52,7 @@ github-oauth:
 ```
 
 - 结构体：`config.GithubOauth{RestrictEnable bool; Orgs string; Users string}`
-- 环境变量覆盖：`RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE` 等（viper replacer `.`/`-` → `_`）
+- 环境变量覆盖：`RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE` 等（viper replacer 将键中 `.`/`-` 统一替换为 `_`）
 - 收敛登录方式：密码登录已直接移除；管理员通过 `github-oauth.admins` 配置引导
 
 ## 5. 任务拆解（DAG）

@@ -119,7 +119,7 @@ github-oauth:
   users: "alice,bob"     # 允许的个人账号，逗号分隔(大小写不敏感)，与 orgs 取并集
 ```
 
-对应环境变量：`RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE`、`RUSTDESK_API_GITHUBOAUTH_ORGS`、`RUSTDESK_API_GITHUBOAUTH_USERS`
+对应环境变量：`RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE`、`RUSTDESK_API_GITHUB_OAUTH_ORGS`、`RUSTDESK_API_GITHUB_OAUTH_USERS`
 
 3. 配置管理员引导（密码登录已移除，需通过 GitHub 账号授予管理员）：
 
@@ -128,7 +128,7 @@ github-oauth:
   admins: "your-github-name"  # 登录后自动授予管理员的 GitHub 账号
 ```
 
-对应环境变量：`RUSTDESK_API_GITHUBOAUTH_ADMINS`
+对应环境变量：`RUSTDESK_API_GITHUB_OAUTH_ADMINS`
 
 行为说明：
 - **传统用户名/密码登录已完全移除**（客户端 `/api/login` 与后台 `/api/admin/login` 均已删除），登录仅支持 GitHub OAuth2/webauth；
@@ -200,9 +200,9 @@ github-oauth:
 | RUSTDESK_API_APP_REGISTER_STATUS                       | 注册用户默认状态; 1 启用，2 禁用, 默认 1                                                      | `1`                          |
 | RUSTDESK_API_APP_CAPTCHA_THRESHOLD                     | 验证码触发次数; -1 不启用， 0 一直启用， >0 登录错误次数后启用 ;默认 `3`                                  | `3`                          |
 | RUSTDESK_API_APP_BAN_THRESHOLD                         | 封禁IP触发次数; 0 不启用, >0 登录错误次数后封禁IP; 默认 `0`                                        | `0`                          |
-| RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE                | 是否启用 GitHub 登录白名单限制; 默认 `false`                                                | `true`                       |
-| RUSTDESK_API_GITHUBOAUTH_ORGS                          | 允许的组织，逗号分隔                                                                     | `acme-org`                   |
-| RUSTDESK_API_GITHUBOAUTH_USERS                         | 允许的个人账号，逗号分隔                                                                   | `alice,bob`                  |
+| RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE                | 是否启用 GitHub 登录白名单限制; 默认 `false`                                                | `true`                       |
+| RUSTDESK_API_GITHUB_OAUTH_ORGS                          | 允许的组织，逗号分隔                                                                     | `acme-org`                   |
+| RUSTDESK_API_GITHUB_OAUTH_USERS                         | 允许的个人账号，逗号分隔                                                                   | `alice,bob`                  |
 | -----ADMIN配置-----                                      | ----------                                                                     | ----------                   |
 | RUSTDESK_API_ADMIN_TITLE                               | 后台标题                                                                           | `RustDesk Api Admin`         |
 | RUSTDESK_API_ADMIN_HELLO                               | 后台欢迎语，可以使用`html`                                                               |                              |

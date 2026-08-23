@@ -2,6 +2,8 @@ package cache
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/go-redis/redis/v8"
 	"reflect"
 	"testing"
@@ -62,7 +64,7 @@ func TestFileCacheGet(t *testing.T) {
 
 func TestRedisCacheSet(t *testing.T) {
 	rc := NewRedis(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddr(t),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -75,7 +77,7 @@ func TestRedisCacheSet(t *testing.T) {
 
 func TestRedisCacheGet(t *testing.T) {
 	rc := NewRedis(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddr(t),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -89,4 +91,14 @@ func TestRedisCacheGet(t *testing.T) {
 		t.Fatalf("读取失败")
 	}
 	fmt.Println("res", res)
+}
+
+// testRedisAddr 返回测试用 Redis 地址（环境变量 TEST_REDIS_ADDR），
+// 未设置时跳过测试，避免依赖特定内网环境。
+func testRedisAddr(t *testing.T) string {
+	addr := os.Getenv("TEST_REDIS_ADDR")
+	if addr == "" {
+		t.Skip("TEST_REDIS_ADDR not set, skip redis test")
+	}
+	return addr
 }

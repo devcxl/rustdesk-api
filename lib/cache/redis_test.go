@@ -2,6 +2,8 @@ package cache
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/go-redis/redis/v8"
 	"reflect"
 	"testing"
@@ -10,7 +12,7 @@ import (
 func TestRedisSet(t *testing.T) {
 	//rc := New("redis")
 	rc := RedisCacheInit(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddr(t),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -23,7 +25,7 @@ func TestRedisSet(t *testing.T) {
 
 func TestRedisGet(t *testing.T) {
 	rc := RedisCacheInit(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddr(t),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -41,7 +43,7 @@ func TestRedisGet(t *testing.T) {
 
 func TestRedisGetJson(t *testing.T) {
 	rc := RedisCacheInit(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddr(t),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -70,7 +72,7 @@ func TestRedisGetJson(t *testing.T) {
 
 func BenchmarkRSet(b *testing.B) {
 	rc := RedisCacheInit(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddrB(b),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -82,7 +84,7 @@ func BenchmarkRSet(b *testing.B) {
 
 func BenchmarkRGet(b *testing.B) {
 	rc := RedisCacheInit(&redis.Options{
-		Addr:     "192.168.1.168:6379",
+		Addr:     testRedisAddrB(b),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -91,4 +93,13 @@ func BenchmarkRGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		rc.Get("123", &v)
 	}
+}
+
+// testRedisAddrB Benchmark 使用的 Redis 地址（环境变量 TEST_REDIS_ADDR），未设置时跳过
+func testRedisAddrB(b *testing.B) string {
+	addr := os.Getenv("TEST_REDIS_ADDR")
+	if addr == "" {
+		b.Skip("TEST_REDIS_ADDR not set, skip redis benchmark")
+	}
+	return addr
 }

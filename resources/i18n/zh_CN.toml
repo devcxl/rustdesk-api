@@ -160,3 +160,8 @@ other = "已被封禁。"
 description = "Register success, wait for admin confirm."
 one = "注册成功，请等待管理员审核。"
 other = "注册成功，请等待管理员审核。"
+[GithubAccessDenied]
+description = "Github access denied."
+one = "该 GitHub 账号无权登录。"
+other = "该 GitHub 账号无权登录。"
+

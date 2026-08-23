@@ -62,6 +62,9 @@ func (oci *OauthCacheItem) ToOauthUser() *model.OauthUser {
 
 var OauthCache = &sync.Map{}
 
+// githubMembershipURLFmt GitHub 组织成员资格查询接口，测试时可替换为 httptest 地址
+var githubMembershipURLFmt = "https://api.github.com/user/memberships/orgs/%s"
+
 const (
 	OauthActionTypeLogin = "login"
 	OauthActionTypeBind  = "bind"
@@ -306,11 +309,67 @@ func (os *OauthService) githubCallback(oauthConfig *oauth2.Config, provider *oid
 	if err != nil {
 		return err, nil
 	}
+	// 白名单限制：仅允许配置的个人账号或指定组织的成员
+	if err := os.checkGithubAccess(client, user.Login); err != nil {
+		return err, nil
+	}
 	err = os.getGithubPrimaryEmail(client, user)
 	if err != nil {
 		return err, nil
 	}
 	return nil, user.ToOauthUser()
+}
+
+// splitCsv 拆分逗号分隔的配置项，去除空白项与首尾空格
+func splitCsv(s string) []string {
+	items := strings.Split(s, ",")
+	res := make([]string, 0, len(items))
+	for _, v := range items {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			res = append(res, v)
+		}
+	}
+	return res
+}
+
+// checkGithubAccess 校验 GitHub 用户是否允许登录。
+// 未启用限制(restrict-enable=false)时直接放行；
+// 启用后仅允许 users 白名单中的账号或 orgs 中任一组织的有效成员(active)，
+// 校验过程中发生错误按拒绝处理(fail-closed)。
+// 该校验位于 github 回调处，可同时拦截登录、自动注册与绑定三条路径。
+func (os *OauthService) checkGithubAccess(client *http.Client, login string) error {
+	cfg := Config.GithubOauth
+	if !cfg.RestrictEnable {
+		return nil
+	}
+	for _, u := range splitCsv(cfg.Users) {
+		if strings.EqualFold(u, login) {
+			return nil
+		}
+	}
+	for _, org := range splitCsv(cfg.Orgs) {
+		resp, err := client.Get(fmt.Sprintf(githubMembershipURLFmt, url.PathEscape(org)))
+		if err != nil {
+			if Logger != nil {
+				Logger.Warnf("check github org membership failed: %v", err)
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			continue
+		}
+		var m struct {
+			State string `json:"state"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&m)
+		resp.Body.Close()
+		if err == nil && m.State == "active" {
+			return nil
+		}
+	}
+	return errors.New("GithubAccessDenied")
 }
 
 // linuxdoCallback linux.do回调

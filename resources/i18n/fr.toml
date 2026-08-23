@@ -167,3 +167,9 @@ other = "Banni."
 description = "Register success wait admin confirm."
 one = "Inscription réussie, veuillez attendre la confirmation de l'administrateur."
 other = "Inscription réussie, veuillez attendre la confirmation de l'administrateur."
+
+[GithubAccessDenied]
+description = "Github access denied."
+one = "Ce compte GitHub n'est pas autorisé à se connecter."
+other = "Ce compte GitHub n'est pas autorisé à se connecter."
+

@@ -167,3 +167,9 @@ other = "已被禁用。"
 description = "Register success, wait admin confirm."
 one = "註冊成功，等待管理員確認。"
 other = "註冊成功，等待管理員確認。"
+
+[GithubAccessDenied]
+description = "Github access denied."
+one = "該 GitHub 帳號無權登入。"
+other = "該 GitHub 帳號無權登入。"
+

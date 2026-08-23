@@ -167,3 +167,9 @@ other = "Заблокировано."
 description = "Register success wait admin confirm."
 one = "Регистрация прошла успешно, ожидайте подтверждения администратора."
 other = "Регистрация прошла успешно, ожидайте подтверждения администратора."
+
+[GithubAccessDenied]
+description = "Github access denied."
+one = "Этой учётной записи GitHub запрещён вход."
+other = "Этой учётной записи GitHub запрещён вход."
+

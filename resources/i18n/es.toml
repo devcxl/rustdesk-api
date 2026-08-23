@@ -167,3 +167,8 @@ other = "Prohibido."
 description = "Register success, wait admin confirm."
 one = "Registro exitoso, espere la confirmación del administrador."
 other = "Registro exitoso, espere la confirmación del administrador."
+[GithubAccessDenied]
+description = "Github access denied."
+one = "Esta cuenta de GitHub no tiene permiso para iniciar sesión."
+other = "Esta cuenta de GitHub no tiene permiso para iniciar sesión."
+

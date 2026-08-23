@@ -104,6 +104,30 @@
       中创建,地址 [https://github.com/settings/developers](https://github.com/settings/developers)
     - `Authorization callback URL`填写`http://<your server[:port]>/api/oidc/callback`
       ，比如`http://127.0.0.1:21114/api/oidc/callback`
+
+### GitHub OAuth2 受限登录（组织/个人白名单）
+
+可以将登录方式收敛为 GitHub OAuth2，并通过配置限定**指定个人账号**或**指定组织的成员**才可登录使用。
+
+1. 在后台「Oauth 管理」创建 Github 类型的 provider，填入 client-id / client-secret；
+2. 配置白名单（`conf/config.yaml` 或环境变量）：
+
+```yaml
+github-oauth:
+  restrict-enable: true  # 启用白名单限制
+  orgs: "acme-org"       # 允许的组织，逗号分隔
+  users: "alice,bob"     # 允许的个人账号，逗号分隔(大小写不敏感)，与 orgs 取并集
+```
+
+对应环境变量：`RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE`、`RUSTDESK_API_GITHUBOAUTH_ORGS`、`RUSTDESK_API_GITHUBOAUTH_USERS`
+
+3. （可选）配合 `app.disable-pwd-login: true` 禁用密码登录，仅保留 GitHub 登录入口。
+
+行为说明：
+- 启用限制后，GitHub 授权回调时会校验：命中 `users` 白名单，或为任一 `orgs` 的有效成员(active)；否则拒绝登录/注册/绑定，页面提示“该 GitHub 账号无权登录”；
+- 校验使用用户自己的授权 token 调用 `GET /user/memberships/orgs/{org}`，无需额外权限；
+- GitHub API 异常时按拒绝处理（fail-closed），不会放大权限；
+- 未启用(`restrict-enable: false`)时行为与原来完全一致。
 7. 登录日志
 8. 链接日志
 9. 文件传输日志
@@ -171,6 +195,9 @@
 | RUSTDESK_API_APP_REGISTER_STATUS                       | 注册用户默认状态; 1 启用，2 禁用, 默认 1                                                      | `1`                          |
 | RUSTDESK_API_APP_CAPTCHA_THRESHOLD                     | 验证码触发次数; -1 不启用， 0 一直启用， >0 登录错误次数后启用 ;默认 `3`                                  | `3`                          |
 | RUSTDESK_API_APP_BAN_THRESHOLD                         | 封禁IP触发次数; 0 不启用, >0 登录错误次数后封禁IP; 默认 `0`                                        | `0`                          |
+| RUSTDESK_API_GITHUBOAUTH_RESTRICTENABLE                | 是否启用 GitHub 登录白名单限制; 默认 `false`                                                | `true`                       |
+| RUSTDESK_API_GITHUBOAUTH_ORGS                          | 允许的组织，逗号分隔                                                                     | `acme-org`                   |
+| RUSTDESK_API_GITHUBOAUTH_USERS                         | 允许的个人账号，逗号分隔                                                                   | `alice,bob`                  |
 | -----ADMIN配置-----                                      | ----------                                                                     | ----------                   |
 | RUSTDESK_API_ADMIN_TITLE                               | 后台标题                                                                           | `RustDesk Api Admin`         |
 | RUSTDESK_API_ADMIN_HELLO                               | 后台欢迎语，可以使用`html`                                                               |                              |

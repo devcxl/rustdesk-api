@@ -31,22 +31,31 @@ type Admin struct {
 	IdServerPort    int    `mapstructure:"id-server-port"`
 	RelayServerPort int    `mapstructure:"relay-server-port"`
 }
+
+// GithubOauthAccess GitHub OAuth2 登录访问控制配置
+// 仅允许配置的个人账号或指定组织的成员通过 GitHub OAuth2 登录
+type GithubOauthAccess struct {
+	RestrictEnable bool   `mapstructure:"restrict-enable"` // 是否启用白名单限制, 默认关闭
+	Orgs           string `mapstructure:"orgs"`            // 允许的组织, 逗号分隔, 如 "acme-org,subsidiary"
+	Users          string `mapstructure:"users"`           // 允许的个人 GitHub 登录名, 逗号分隔
+}
 type Config struct {
-	Lang       string `mapstructure:"lang"`
-	App        App
-	Admin      Admin
-	Gorm       Gorm
-	Mysql      Mysql
-	Postgresql Postgresql
-	Gin        Gin
-	Logger     Logger
-	Redis      Redis
-	Cache      Cache
-	Oss        Oss
-	Jwt        Jwt
-	Rustdesk   Rustdesk
-	Proxy      Proxy
-	Ldap       Ldap
+	Lang        string `mapstructure:"lang"`
+	App         App
+	Admin       Admin
+	Gorm        Gorm
+	Mysql       Mysql
+	Postgresql  Postgresql
+	Gin         Gin
+	Logger      Logger
+	Redis       Redis
+	Cache       Cache
+	Oss         Oss
+	Jwt         Jwt
+	Rustdesk    Rustdesk
+	Proxy       Proxy
+	Ldap        Ldap
+	GithubOauth GithubOauthAccess `mapstructure:"github-oauth"`
 }
 
 func (a *Admin) Init() {

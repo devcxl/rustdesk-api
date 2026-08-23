@@ -37,6 +37,7 @@ type GithubOauthAccess struct {
 	RestrictEnable bool   `mapstructure:"restrict-enable"` // 是否启用白名单限制, 默认关闭
 	Orgs           string `mapstructure:"orgs"`            // 允许的组织, 逗号分隔, 如 "acme-org,subsidiary"
 	Users          string `mapstructure:"users"`           // 允许的个人 GitHub 登录名, 逗号分隔
+	Admins         string `mapstructure:"admins"`          // 登录后自动授予管理员的 GitHub 登录名, 逗号分隔
 }
 type Config struct {
 	Lang        string `mapstructure:"lang"`

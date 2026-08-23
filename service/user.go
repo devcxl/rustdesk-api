@@ -44,33 +44,7 @@ func (us *UserService) InfoByOpenid(openid string) *model.User {
 	return u
 }
 
-// InfoByUsernamePassword 根据用户名密码取用户信息
-func (us *UserService) InfoByUsernamePassword(username, password string) *model.User {
-	if Config.Ldap.Enable {
-		u, err := AllService.LdapService.Authenticate(username, password)
-		if err == nil {
-			return u
-		}
-		Logger.Errorf("LDAP authentication failed, %v", err)
-		Logger.Warn("Fallback to local database")
-	}
-	u := &model.User{}
-	DB.Where("username = ?", username).First(u)
-	if u.Id == 0 {
-		return u
-	}
-	ok, newHash, err := utils.VerifyPassword(u.Password, password)
-	if err != nil || !ok {
-		return &model.User{}
-	}
-	if newHash != "" {
-		DB.Model(u).Update("password", newHash)
-		u.Password = newHash
-	}
-	return u
-}
-
-// InfoByAccesstoken 根据accesstoken取用户信息
+// InfoByAccessToken 根据accesstoken取用户信息
 func (us *UserService) InfoByAccessToken(token string) (*model.User, *model.UserToken) {
 	u := &model.User{}
 	ut := &model.UserToken{}

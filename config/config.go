@@ -20,7 +20,6 @@ type App struct {
 	ShowSwagger      int           `mapstructure:"show-swagger"`
 	TokenExpire      time.Duration `mapstructure:"token-expire"`
 	WebSso           bool          `mapstructure:"web-sso"`
-	DisablePwdLogin  bool          `mapstructure:"disable-pwd-login"`
 	CaptchaThreshold int           `mapstructure:"captcha-threshold"`
 	BanThreshold     int           `mapstructure:"ban-threshold"`
 }

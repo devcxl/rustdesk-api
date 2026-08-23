@@ -82,3 +82,7 @@ ldap:
     sync: false         # If true, the user will be synchronized to the database when the user logs in. If false, the user will be synchronized to the database when the user be created.
     admin-group: "cn=admin,dc=example,dc=com" # The group name of the admin group, if the user is in this group, the user will be an admin.
     allow-group: "cn=users,dc=example,dc=com" # The group name of the users group, if the user is in this group, the user will be an login. 
+github-oauth:
+  restrict-enable: false # 是否启用 GitHub OAuth2 登录白名单限制
+  orgs: ""               # 允许的组织，逗号分隔，如 "acme-org,subsidiary"
+  users: ""              # 允许的个人 GitHub 登录名，逗号分隔，如 "alice,bob"

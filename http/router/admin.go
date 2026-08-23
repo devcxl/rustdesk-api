@@ -64,8 +64,7 @@ func RustdeskCmdBind(adg *gin.RouterGroup) {
 }
 func LoginBind(rg *gin.RouterGroup) {
 	cont := &admin.Login{}
-	rg.POST("/login", cont.Login)
-	rg.GET("/captcha", cont.Captcha)
+	// 密码登录已废弃，仅保留 OAuth 登录与登出
 	rg.POST("/logout", cont.Logout)
 	rg.GET("/login-options", cont.LoginOptions)
 	rg.POST("/oidc/auth", cont.OidcAuth)

@@ -34,8 +34,8 @@ func ApiInit(g *gin.Engine) {
 	{
 		l := &api.Login{}
 		// 如果返回oidc则可以通过oidc登录
+		// 密码登录已废弃，仅保留登录选项与登出
 		frg.GET("/login-options", l.LoginOptions)
-		frg.POST("/login", l.Login)
 
 	}
 

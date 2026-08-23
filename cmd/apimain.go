@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -48,60 +47,8 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-var resetPwdCmd = &cobra.Command{
-	Use:     "reset-admin-pwd [pwd]",
-	Example: "reset-admin-pwd 123456",
-	Short:   "Reset Admin Password",
-	Args:    cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		pwd := args[0]
-		admin := service.AllService.UserService.InfoById(1)
-		if admin.Id == 0 {
-			global.Logger.Warn("user not found! ")
-			return
-		}
-		err := service.AllService.UserService.UpdatePassword(admin, pwd)
-		if err != nil {
-			global.Logger.Error("reset password fail! ", err)
-			return
-		}
-		global.Logger.Info("reset password success! ")
-	},
-}
-var resetUserPwdCmd = &cobra.Command{
-	Use:     "reset-pwd [userId] [pwd]",
-	Example: "reset-pwd 2 123456",
-	Short:   "Reset User Password",
-	Args:    cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		userId := args[0]
-		pwd := args[1]
-		uid, err := strconv.Atoi(userId)
-		if err != nil {
-			global.Logger.Warn("userId must be int!")
-			return
-		}
-		if uid <= 0 {
-			global.Logger.Warn("userId must be greater than 0! ")
-			return
-		}
-		u := service.AllService.UserService.InfoById(uint(uid))
-		if u.Id == 0 {
-			global.Logger.Warn("user not found! ")
-			return
-		}
-		err = service.AllService.UserService.UpdatePassword(u, pwd)
-		if err != nil {
-			global.Logger.Warn("reset password fail! ", err)
-			return
-		}
-		global.Logger.Info("reset password success!")
-	},
-}
-
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&global.ConfigPath, "config", "c", "./conf/config.yaml", "choose config file")
-	rootCmd.AddCommand(resetPwdCmd, resetUserPwdCmd)
 }
 func main() {
 	if err := rootCmd.Execute(); err != nil {

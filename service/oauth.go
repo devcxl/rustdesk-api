@@ -358,6 +358,10 @@ func (os *OauthService) checkGithubAccess(client *http.Client, login string) err
 			return nil
 		}
 	}
+	// admins 名单内的账号视为始终允许：管理员由部署者显式指定，不应因未配 orgs/users 而被拒之门外
+	if isAdminListed(cfg.Admins, login) {
+		return nil
+	}
 	for _, org := range splitCsv(cfg.Orgs) {
 		resp, err := client.Get(fmt.Sprintf(githubMembershipURLFmt, url.PathEscape(org)))
 		if err != nil {

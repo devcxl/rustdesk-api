@@ -62,6 +62,27 @@ func TestCheckGithubAccessAllowedByUser(t *testing.T) {
 	}
 }
 
+func TestCheckGithubAccessAllowedByAdmins(t *testing.T) {
+	// 只配 admins、不配 orgs/users，管理员账号也应放行（部署者显式指定的可信账号）
+	setupGithubMembershipMock(t, nil)
+	Config = &config.Config{GithubOauth: config.GithubOauthAccess{
+		RestrictEnable: true,
+		Orgs:           "",
+		Users:          "",
+		Admins:         "devcxl, ops-team",
+	}}
+	os := &OauthService{}
+	if err := os.checkGithubAccess(http.DefaultClient, "devcxl"); err != nil {
+		t.Fatalf("admin devcxl should pass without orgs/users, got %v", err)
+	}
+	if err := os.checkGithubAccess(http.DefaultClient, "OPS-TEAM"); err != nil {
+		t.Fatalf("admin OPS-TEAM should pass (case-insensitive), got %v", err)
+	}
+	if err := os.checkGithubAccess(http.DefaultClient, "mallory"); err == nil {
+		t.Fatal("non-admin mallory should still be denied")
+	}
+}
+
 func TestCheckGithubAccessAllowedByOrgMember(t *testing.T) {
 	setupGithubMembershipMock(t, map[string]string{"acme": "active", "subsidiary": "pending"})
 	Config = &config.Config{GithubOauth: config.GithubOauthAccess{

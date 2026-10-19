@@ -5,10 +5,11 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 jobs:
   test:
-    name: Vet & Test
+    name: Code Quality & Build Check
     runs-on: ubuntu-latest
     services:
       redis:
@@ -55,8 +56,14 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
+      - name: Verify Go Build
+        run: go build -o /dev/null ./cmd/apimain.go
+
+  # 4 架构全量交叉编译仅在合并入 master 或手动触发时执行，加速 PR 反馈
   build:
-    name: Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+    name: Cross-Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+    needs: test
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

@@ -33,15 +33,35 @@ func setupGithubMembershipMock(t *testing.T, memberships map[string]string) stri
 	return srv.URL
 }
 
-func TestCheckGithubAccessDisabled(t *testing.T) {
+func TestCheckGithubAccessDisabledWhenNoUsersConfigured(t *testing.T) {
 	Config = &config.Config{GithubOauth: config.GithubOauthAccess{
 		RestrictEnable: false,
-		Orgs:           "acme",
-		Users:          "alice",
+		Orgs:           "",
+		Users:          "",
 	}}
 	os := &OauthService{}
 	if err := os.checkGithubAccess(http.DefaultClient, "anyone"); err != nil {
-		t.Fatalf("restrict disabled should allow anyone, got %v", err)
+		t.Fatalf("no restriction should allow anyone, got %v", err)
+	}
+}
+
+func TestCheckGithubAccessEnvAllowedUsers(t *testing.T) {
+	// 验证通过环境变量 ALLOWED_USERS 控制可登录的用户名
+	t.Setenv("ALLOWED_USERS", "devcxl, Alice")
+	Config = &config.Config{GithubOauth: config.GithubOauthAccess{
+		RestrictEnable: false,
+		Users:          "",
+	}}
+	os := &OauthService{}
+
+	if err := os.checkGithubAccess(http.DefaultClient, "devcxl"); err != nil {
+		t.Fatalf("devcxl should pass via ALLOWED_USERS, got %v", err)
+	}
+	if err := os.checkGithubAccess(http.DefaultClient, "alice"); err != nil {
+		t.Fatalf("alice should pass case-insensitively, got %v", err)
+	}
+	if err := os.checkGithubAccess(http.DefaultClient, "mallory"); err == nil {
+		t.Fatal("mallory should be denied when ALLOWED_USERS is set")
 	}
 }
 
@@ -60,10 +80,12 @@ func TestCheckGithubAccessAllowedByUser(t *testing.T) {
 	if err := os.checkGithubAccess(http.DefaultClient, "BOB"); err != nil {
 		t.Fatalf("whitelisted user BOB should pass, got %v", err)
 	}
+	if err := os.checkGithubAccess(http.DefaultClient, "stranger"); err == nil {
+		t.Fatal("stranger should be denied")
+	}
 }
 
 func TestCheckGithubAccessAllowedByAdmins(t *testing.T) {
-	// 只配 admins、不配 orgs/users，管理员账号也应放行（部署者显式指定的可信账号）
 	setupGithubMembershipMock(t, nil)
 	Config = &config.Config{GithubOauth: config.GithubOauthAccess{
 		RestrictEnable: true,
@@ -104,14 +126,12 @@ func TestCheckGithubAccessDeniedForPendingOrNonMember(t *testing.T) {
 		Users:          "alice",
 	}}
 	os := &OauthService{}
-	// 非 org 成员且不在白名单
 	if err := os.checkGithubAccess(http.DefaultClient, "mallory"); err == nil {
 		t.Fatal("non-member mallory should be denied")
 	}
 }
 
 func TestCheckGithubAccessFailClosedOnServerError(t *testing.T) {
-	// 模拟 GitHub API 完全不可用：指向一个不监听的端口
 	oldFmt := githubMembershipURLFmt
 	githubMembershipURLFmt = "http://127.0.0.1:1/user/memberships/orgs/%s"
 	t.Cleanup(func() { githubMembershipURLFmt = oldFmt })
@@ -134,7 +154,7 @@ func TestIsAdminListed(t *testing.T) {
 		want       bool
 	}{
 		{"alice,bob", "alice", true},
-		{"alice,bob", "ALICE", true}, // 大小写不敏感
+		{"alice,bob", "ALICE", true},
 		{" alice , bob ", "bob", true},
 		{"alice", "mallory", false},
 		{"", "alice", false},

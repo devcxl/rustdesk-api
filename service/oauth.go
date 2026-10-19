@@ -4,39 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/utils"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
-
-	// "golang.org/x/oauth2/google"
 	"gorm.io/gorm"
-	// "io"
-	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type OauthService struct {
 }
 
-// Define a struct to parse the .well-known/openid-configuration response
-type OidcEndpoint struct {
-	Issuer   string `json:"issuer"`
-	AuthURL  string `json:"authorization_endpoint"`
-	TokenURL string `json:"token_endpoint"`
-	UserInfo string `json:"userinfo_endpoint"`
-}
-
 type OauthCacheItem struct {
 	UserId     uint   `json:"user_id"`
-	Id         string `json:"id"` //rustdesk的设备ID
+	Id         string `json:"id"`
 	Op         string `json:"op"`
 	Action     string `json:"action"`
 	Uuid       string `json:"uuid"`
@@ -47,7 +36,7 @@ type OauthCacheItem struct {
 	Username   string `json:"username"`
 	Name       string `json:"name"`
 	Email      string `json:"email"`
-	Verifier   string `json:"verifier"` // used for oauth pkce
+	Verifier   string `json:"verifier"`
 	Nonce      string `json:"nonce"`
 }
 
@@ -77,7 +66,7 @@ func (oci *OauthCacheItem) UpdateFromOauthUser(oauthUser *model.OauthUser) {
 	oci.Email = oauthUser.Email
 }
 
-func (os *OauthService) GetOauthCache(key string) *OauthCacheItem {
+func (svc *OauthService) GetOauthCache(key string) *OauthCacheItem {
 	v, ok := OauthCache.Load(key)
 	if !ok {
 		return nil
@@ -85,69 +74,40 @@ func (os *OauthService) GetOauthCache(key string) *OauthCacheItem {
 	return v.(*OauthCacheItem)
 }
 
-func (os *OauthService) SetOauthCache(key string, item *OauthCacheItem, expire uint) {
+func (svc *OauthService) SetOauthCache(key string, item *OauthCacheItem, expire uint) {
 	OauthCache.Store(key, item)
 	if expire > 0 {
 		time.AfterFunc(time.Duration(expire)*time.Second, func() {
-			os.DeleteOauthCache(key)
+			svc.DeleteOauthCache(key)
 		})
 	}
 }
 
-func (os *OauthService) DeleteOauthCache(key string) {
+func (svc *OauthService) DeleteOauthCache(key string) {
 	OauthCache.Delete(key)
 }
 
-func (os *OauthService) BeginAuth(op string) (error error, state, verifier, nonce, url string) {
-	state = utils.RandomString(10) + strconv.FormatInt(time.Now().Unix(), 10)
-	verifier = ""
-	nonce = ""
-	if op == model.OauthTypeWebauth {
-		url = Config.Rustdesk.ApiServer + "/_admin/#/oauth/" + state
-		//url = "http://localhost:8888/_admin/#/oauth/" + code
-		return nil, state, verifier, nonce, url
-	}
-	err, oauthInfo, oauthConfig, _ := os.GetOauthConfig(op)
-	if err == nil {
-		extras := make([]oauth2.AuthCodeOption, 0, 3)
-
-		nonce = utils.RandomString(10)
-		extras = append(extras, oauth2.SetAuthURLParam("nonce", nonce))
-
-		if oauthInfo.PkceEnable != nil && *oauthInfo.PkceEnable {
-			extras = append(extras, oauth2.AccessTypeOffline)
-			verifier = oauth2.GenerateVerifier()
-			switch oauthInfo.PkceMethod {
-			case model.PKCEMethodS256:
-				extras = append(extras, oauth2.S256ChallengeOption(verifier))
-			case model.PKCEMethodPlain:
-				// oauth2 does not have a plain challenge option, so we add it manually
-				extras = append(extras, oauth2.SetAuthURLParam("code_challenge_method", "plain"), oauth2.SetAuthURLParam("code_challenge", verifier))
-			}
-		}
-
-		return err, state, verifier, nonce, oauthConfig.AuthCodeURL(state, extras...)
-	}
-
-	return err, state, verifier, nonce, ""
-}
-
-func (os *OauthService) FetchOidcProvider(issuer string) (error, *oidc.Provider) {
-
-	// Get the HTTP client (with or without proxy based on configuration)
-	client := getHTTPClientWithProxy()
-
-	ctx := oidc.ClientContext(context.Background(), client)
-
-	provider, err := oidc.NewProvider(ctx, issuer)
+// BeginAuth: Initiate OAuth authentication
+func (svc *OauthService) BeginAuth(op string) (err error, state, verifier, nonce, url string) {
+	err, _, oauthConfig, _ := svc.GetOauthConfig(op)
 	if err != nil {
-		return err, nil
+		return err, "", "", "", ""
 	}
 
-	return nil, provider
+	state = utils.RandomString(32)
+	verifier = utils.RandomString(43)
+	nonce = utils.RandomString(32)
+
+	extras := []oauth2.AuthCodeOption{
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("nonce", nonce),
+		oauth2.S256ChallengeOption(verifier),
+	}
+
+	return nil, state, verifier, nonce, oauthConfig.AuthCodeURL(state, extras...)
 }
 
-func (os *OauthService) GithubProvider() *oidc.Provider {
+func (svc *OauthService) GithubProvider() *oidc.Provider {
 	return (&oidc.ProviderConfig{
 		IssuerURL:     "",
 		AuthURL:       github.Endpoint.AuthURL,
@@ -159,22 +119,9 @@ func (os *OauthService) GithubProvider() *oidc.Provider {
 	}).NewProvider(context.Background())
 }
 
-func (os *OauthService) LinuxdoProvider() *oidc.Provider {
-	return (&oidc.ProviderConfig{
-		IssuerURL:     "",
-		AuthURL:       "https://connect.linux.do/oauth2/authorize",
-		TokenURL:      "https://connect.linux.do/oauth2/token",
-		DeviceAuthURL: "",
-		UserInfoURL:   model.UserEndpointLinuxdo,
-		JWKSURL:       "",
-		Algorithms:    nil,
-	}).NewProvider(context.Background())
-}
-
-// GetOauthConfig retrieves the OAuth2 configuration based on the provider name
-func (os *OauthService) GetOauthConfig(op string) (err error, oauthInfo *model.Oauth, oauthConfig *oauth2.Config, provider *oidc.Provider) {
-	//err, oauthInfo, oauthConfig = os.getOauthConfigGeneral(op)
-	oauthInfo = os.InfoByOp(op)
+// GetOauthConfig 获取 GitHub OAuth2 配置
+func (svc *OauthService) GetOauthConfig(op string) (err error, oauthInfo *model.Oauth, oauthConfig *oauth2.Config, provider *oidc.Provider) {
+	oauthInfo = svc.InfoByOp(model.OauthTypeGithub)
 	if oauthInfo.Id == 0 || oauthInfo.ClientId == "" || oauthInfo.ClientSecret == "" {
 		return errors.New("ConfigNotFound"), nil, nil, nil
 	}
@@ -182,50 +129,27 @@ func (os *OauthService) GetOauthConfig(op string) (err error, oauthInfo *model.O
 		ClientID:     oauthInfo.ClientId,
 		ClientSecret: oauthInfo.ClientSecret,
 		RedirectURL:  Config.Rustdesk.ApiServer + "/api/oidc/callback",
+		Endpoint:     github.Endpoint,
+		Scopes:       []string{"read:user", "user:email"},
 	}
-
-	// Maybe should validate the oauthConfig here
-	oauthType := oauthInfo.OauthType
-	err = model.ValidateOauthType(oauthType)
-	if err != nil {
-		return err, nil, nil, nil
-	}
-	switch oauthType {
-	case model.OauthTypeGithub:
-		oauthConfig.Endpoint = github.Endpoint
-		oauthConfig.Scopes = []string{"read:user", "user:email"}
-		provider = os.GithubProvider()
-	case model.OauthTypeLinuxdo:
-		provider = os.LinuxdoProvider()
-		oauthConfig.Endpoint = provider.Endpoint()
-		oauthConfig.Scopes = []string{"profile"}
-	//case model.OauthTypeGoogle: //google单独出来，可以少一次FetchOidcEndpoint请求
-	//	oauthConfig.Endpoint = google.Endpoint
-	//	oauthConfig.Scopes = os.constructScopes(oauthInfo.Scopes)
-	case model.OauthTypeOidc, model.OauthTypeGoogle:
-		err, provider = os.FetchOidcProvider(oauthInfo.Issuer)
-		if err != nil {
-			return err, nil, nil, nil
-		}
-		oauthConfig.Endpoint = provider.Endpoint()
-		oauthConfig.Scopes = os.constructScopes(oauthInfo.Scopes)
-	default:
-		return errors.New("unsupported OAuth type"), nil, nil, nil
-	}
+	provider = svc.GithubProvider()
 	return nil, oauthInfo, oauthConfig, provider
 }
 
 func getHTTPClientWithProxy() *http.Client {
-	//add timeout 30s
 	timeout := time.Duration(60) * time.Second
 	if Config.Proxy.Enable {
 		if Config.Proxy.Host == "" {
-			Logger.Warn("Proxy is enabled but proxy host is empty.")
+			if Logger != nil {
+				Logger.Warn("Proxy is enabled but proxy host is empty.")
+			}
 			return http.DefaultClient
 		}
 		proxyURL, err := url.Parse(Config.Proxy.Host)
 		if err != nil {
-			Logger.Warn("Invalid proxy URL: ", err)
+			if Logger != nil {
+				Logger.Warn("Invalid proxy URL: ", err)
+			}
 			return http.DefaultClient
 		}
 		transport := &http.Transport{
@@ -235,9 +159,8 @@ func getHTTPClientWithProxy() *http.Client {
 	}
 	return http.DefaultClient
 }
-func (os *OauthService) callbackBase(oauthConfig *oauth2.Config, provider *oidc.Provider, code string, verifier string, nonce string, userData interface{}) (err error, client *http.Client) {
 
-	// 设置代理客户端
+func (svc *OauthService) callbackBase(oauthConfig *oauth2.Config, provider *oidc.Provider, code string, verifier string, nonce string, userData interface{}) (err error, client *http.Client) {
 	httpClient := getHTTPClientWithProxy()
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient)
 
@@ -247,73 +170,49 @@ func (os *OauthService) callbackBase(oauthConfig *oauth2.Config, provider *oidc.
 	}
 
 	token, err := oauthConfig.Exchange(ctx, code, exchangeOpts...)
-
 	if err != nil {
-		Logger.Warn("oauthConfig.Exchange() failed: ", err)
+		if Logger != nil {
+			Logger.Warn("oauthConfig.Exchange() failed: ", err)
+		}
 		return errors.New("GetOauthTokenError"), nil
 	}
 
-	// 获取 ID Token， github没有id_token
-	rawIDToken, ok := token.Extra("id_token").(string)
-	if ok && rawIDToken != "" {
-		// 验证 ID Token
-		v := provider.Verifier(&oidc.Config{ClientID: oauthConfig.ClientID})
-		idToken, err2 := v.Verify(ctx, rawIDToken)
-		if err2 != nil {
-			Logger.Warn("IdTokenVerifyError: ", err2)
-			return errors.New("IdTokenVerifyError"), nil
-		}
-		if nonce != "" {
-			// 验证 nonce
-			var claims struct {
-				Nonce string `json:"nonce"`
-			}
-			if err2 = idToken.Claims(&claims); err2 != nil {
-				Logger.Warn("Failed to parse ID Token claims: ", err)
-				return errors.New("IDTokenClaimsError"), nil
-			}
-
-			if claims.Nonce != nonce {
-				Logger.Warn("Nonce does not match")
-				return errors.New("NonceDoesNotMatch"), nil
-			}
-		}
-	}
-
-	// 获取用户信息
 	client = oauthConfig.Client(ctx, token)
 	resp, err := client.Get(provider.UserInfoEndpoint())
 	if err != nil {
-		Logger.Warn("failed getting user info: ", err)
+		if Logger != nil {
+			Logger.Warn("failed getting user info: ", err)
+		}
 		return errors.New("GetOauthUserInfoError"), nil
 	}
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
+		if closeErr := resp.Body.Close(); closeErr != nil && Logger != nil {
 			Logger.Warn("failed closing response body: ", closeErr)
 		}
 	}()
 
-	// 解析用户信息
 	if err = json.NewDecoder(resp.Body).Decode(userData); err != nil {
-		Logger.Warn("failed decoding user info: ", err)
+		if Logger != nil {
+			Logger.Warn("failed decoding user info: ", err)
+		}
 		return errors.New("DecodeOauthUserInfoError"), nil
 	}
 
 	return nil, client
 }
 
-// githubCallback github回调
-func (os *OauthService) githubCallback(oauthConfig *oauth2.Config, provider *oidc.Provider, code, verifier, nonce string) (error, *model.OauthUser) {
+// githubCallback github 回调处理
+func (svc *OauthService) githubCallback(oauthConfig *oauth2.Config, provider *oidc.Provider, code, verifier, nonce string) (error, *model.OauthUser) {
 	var user = &model.GithubUser{}
-	err, client := os.callbackBase(oauthConfig, provider, code, verifier, nonce, user)
+	err, client := svc.callbackBase(oauthConfig, provider, code, verifier, nonce, user)
 	if err != nil {
 		return err, nil
 	}
-	// 白名单限制：仅允许配置的个人账号或指定组织的成员
-	if err := os.checkGithubAccess(client, user.Login); err != nil {
+	// 校验 GitHub 登录名是否在允许列表中
+	if err := svc.checkGithubAccess(client, user.Login); err != nil {
 		return err, nil
 	}
-	err = os.getGithubPrimaryEmail(client, user)
+	err = svc.getGithubPrimaryEmail(client, user)
 	if err != nil {
 		return err, nil
 	}
@@ -343,25 +242,70 @@ func isAdminListed(adminsCsv, login string) bool {
 	return false
 }
 
-// checkGithubAccess 校验 GitHub 用户是否允许登录。
-// 未启用限制(restrict-enable=false)时直接放行；
-// 启用后仅允许 users 白名单中的账号或 orgs 中任一组织的有效成员(active)，
-// 校验过程中发生错误按拒绝处理(fail-closed)。
-// 该校验位于 github 回调处，可同时拦截登录、自动注册与绑定三条路径。
-func (os *OauthService) checkGithubAccess(client *http.Client, login string) error {
-	cfg := Config.GithubOauth
-	if !cfg.RestrictEnable {
-		return nil
+// GetAllowedGithubUsers 获取环境变量或配置中允许登录的 GitHub 用户名列表
+func (svc *OauthService) GetAllowedGithubUsers() []string {
+	var sources []string
+	// 支持多种常见环境变量名称
+	envKeys := []string{
+		"ALLOWED_USERS",
+		"GITHUB_ALLOWED_USERS",
+		"RUSTDESK_ALLOWED_USERS",
+		"RUSTDESK_API_GITHUB_OAUTH_USERS",
 	}
-	for _, u := range splitCsv(cfg.Users) {
-		if strings.EqualFold(u, login) {
-			return nil
+	for _, key := range envKeys {
+		if val := os.Getenv(key); val != "" {
+			sources = append(sources, val)
 		}
 	}
-	// admins 名单内的账号视为始终允许：管理员由部署者显式指定，不应因未配 orgs/users 而被拒之门外
+	if Config != nil && Config.GithubOauth.Users != "" {
+		sources = append(sources, Config.GithubOauth.Users)
+	}
+
+	userMap := make(map[string]struct{})
+	for _, src := range sources {
+		for _, u := range splitCsv(src) {
+			userMap[strings.ToLower(u)] = struct{}{}
+		}
+	}
+	res := make([]string, 0, len(userMap))
+	for u := range userMap {
+		res = append(res, u)
+	}
+	return res
+}
+
+// checkGithubAccess 校验 GitHub 用户是否允许登录。
+// 当环境变量或配置指定了可登录用户名时，强制进行白名单校验；
+// 未指定用户时，若配置了组织则检查组织成员资格；其余情况按 RestrictEnable 策略控制。
+func (svc *OauthService) checkGithubAccess(client *http.Client, login string) error {
+	cfg := Config.GithubOauth
+	allowedUsers := svc.GetAllowedGithubUsers()
+
+	// 1. 如果通过环境变量或配置指定了可登录用户名，强制白名单拦截
+	if len(allowedUsers) > 0 {
+		for _, u := range allowedUsers {
+			if strings.EqualFold(u, login) {
+				return nil
+			}
+		}
+		// 若部署者在 admins 中显式配置，亦允许通过
+		if isAdminListed(cfg.Admins, login) {
+			return nil
+		}
+		return errors.New("GithubAccessDenied")
+	}
+
+	// 2. 如果未指定具体用户，但配置了 admins 且命中，放行
 	if isAdminListed(cfg.Admins, login) {
 		return nil
 	}
+
+	// 3. 检查是否启用了限制
+	if !cfg.RestrictEnable {
+		return nil
+	}
+
+	// 4. 检查组织白名单
 	for _, org := range splitCsv(cfg.Orgs) {
 		resp, err := client.Get(fmt.Sprintf(githubMembershipURLFmt, url.PathEscape(org)))
 		if err != nil {
@@ -386,56 +330,24 @@ func (os *OauthService) checkGithubAccess(client *http.Client, login string) err
 	return errors.New("GithubAccessDenied")
 }
 
-// linuxdoCallback linux.do回调
-func (os *OauthService) linuxdoCallback(oauthConfig *oauth2.Config, provider *oidc.Provider, code, verifier, nonce string) (error, *model.OauthUser) {
-	var user = &model.LinuxdoUser{}
-	err, _ := os.callbackBase(oauthConfig, provider, code, verifier, nonce, user)
+// Callback: 通过授权码与 verifier 获取用户信息
+func (svc *OauthService) Callback(code, verifier, op, nonce string) (err error, oauthUser *model.OauthUser) {
+	err, _, oauthConfig, provider := svc.GetOauthConfig(op)
 	if err != nil {
 		return err, nil
 	}
-	return nil, user.ToOauthUser()
+	return svc.githubCallback(oauthConfig, provider, code, verifier, nonce)
 }
 
-// oidcCallback oidc回调, 通过code获取用户信息
-func (os *OauthService) oidcCallback(oauthConfig *oauth2.Config, provider *oidc.Provider, code, verifier, nonce string) (error, *model.OauthUser) {
-	var user = &model.OidcUser{}
-	if err, _ := os.callbackBase(oauthConfig, provider, code, verifier, nonce, user); err != nil {
-		return err, nil
-	}
-	return nil, user.ToOauthUser()
-}
-
-// Callback: Get user information by code and op(Oauth provider)
-func (os *OauthService) Callback(code, verifier, op, nonce string) (err error, oauthUser *model.OauthUser) {
-	err, oauthInfo, oauthConfig, provider := os.GetOauthConfig(op)
-	// oauthType is already validated in GetOauthConfig
-	if err != nil {
-		return err, nil
-	}
-	oauthType := oauthInfo.OauthType
-	switch oauthType {
-	case model.OauthTypeGithub:
-		err, oauthUser = os.githubCallback(oauthConfig, provider, code, verifier, nonce)
-	case model.OauthTypeLinuxdo:
-		err, oauthUser = os.linuxdoCallback(oauthConfig, provider, code, verifier, nonce)
-	case model.OauthTypeOidc, model.OauthTypeGoogle:
-		err, oauthUser = os.oidcCallback(oauthConfig, provider, code, verifier, nonce)
-	default:
-		return errors.New("unsupported OAuth type"), nil
-	}
-	return err, oauthUser
-}
-
-func (os *OauthService) UserThirdInfo(op string, openId string) *model.UserThird {
+func (svc *OauthService) UserThirdInfo(op string, openId string) *model.UserThird {
 	ut := &model.UserThird{}
 	DB.Where("open_id = ? and op = ?", openId, op).First(ut)
 	return ut
 }
 
-// BindOauthUser: Bind third party account
-func (os *OauthService) BindOauthUser(userId uint, oauthUser *model.OauthUser, op string) error {
+func (svc *OauthService) BindOauthUser(userId uint, oauthUser *model.OauthUser, op string) error {
 	utr := &model.UserThird{}
-	err, oauthType := os.GetTypeByOp(op)
+	err, oauthType := svc.GetTypeByOp(op)
 	if err != nil {
 		return err
 	}
@@ -443,51 +355,31 @@ func (os *OauthService) BindOauthUser(userId uint, oauthUser *model.OauthUser, o
 	return DB.Create(utr).Error
 }
 
-// UnBindOauthUser: Unbind third party account
-func (os *OauthService) UnBindOauthUser(userId uint, op string) error {
-	return os.UnBindThird(op, userId)
+func (svc *OauthService) UnBindOauthUser(userId uint, op string) error {
+	return svc.UnBindThird(op, userId)
 }
 
-// UnBindThird: Unbind third party account
-func (os *OauthService) UnBindThird(op string, userId uint) error {
+func (svc *OauthService) UnBindThird(op string, userId uint) error {
 	return DB.Where("user_id = ? and op = ?", userId, op).Delete(&model.UserThird{}).Error
 }
 
-// DeleteUserByUserId: When user is deleted, delete all third party bindings
-func (os *OauthService) DeleteUserByUserId(userId uint) error {
+func (svc *OauthService) DeleteUserByUserId(userId uint) error {
 	return DB.Where("user_id = ?", userId).Delete(&model.UserThird{}).Error
 }
 
-// InfoById 根据id获取Oauth信息
-func (os *OauthService) InfoById(id uint) *model.Oauth {
+func (svc *OauthService) InfoById(id uint) *model.Oauth {
 	oauthInfo := &model.Oauth{}
 	DB.Where("id = ?", id).First(oauthInfo)
 	return oauthInfo
 }
 
-// InfoByOp 根据op获取Oauth信息
-func (os *OauthService) InfoByOp(op string) *model.Oauth {
+func (svc *OauthService) InfoByOp(op string) *model.Oauth {
 	oauthInfo := &model.Oauth{}
 	DB.Where("op = ?", op).First(oauthInfo)
 	return oauthInfo
 }
 
-// Helper function to get scopes by operation
-func (os *OauthService) getScopesByOp(op string) []string {
-	scopes := os.InfoByOp(op).Scopes
-	return os.constructScopes(scopes)
-}
-
-// Helper function to construct scopes
-func (os *OauthService) constructScopes(scopes string) []string {
-	scopes = strings.TrimSpace(scopes)
-	if scopes == "" {
-		scopes = model.OIDC_DEFAULT_SCOPES
-	}
-	return strings.Split(scopes, ",")
-}
-
-func (os *OauthService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *model.OauthList) {
+func (svc *OauthService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *model.OauthList) {
 	res = &model.OauthList{}
 	res.Page = int64(page)
 	res.PageSize = int64(pageSize)
@@ -501,114 +393,80 @@ func (os *OauthService) List(page, pageSize uint, where func(tx *gorm.DB)) (res 
 	return
 }
 
-// GetTypeByOp 根据op获取OauthType
-func (os *OauthService) GetTypeByOp(op string) (error, string) {
-	oauthInfo := &model.Oauth{}
-	if DB.Where("op = ?", op).First(oauthInfo).Error != nil {
-		return fmt.Errorf("OAuth provider with op '%s' not found", op), ""
-	}
-	return nil, oauthInfo.OauthType
+func (svc *OauthService) GetTypeByOp(op string) (error, string) {
+	return nil, model.OauthTypeGithub
 }
 
-// ValidateOauthProvider 验证Oauth提供者是否正确
-func (os *OauthService) ValidateOauthProvider(op string) error {
-	if !os.IsOauthProviderExist(op) {
-		return fmt.Errorf("OAuth provider with op '%s' not found", op)
-	}
-	return nil
+func (svc *OauthService) Create(oauthInfo *model.Oauth) error {
+	oauthInfo.Op = model.OauthTypeGithub
+	oauthInfo.OauthType = model.OauthTypeGithub
+	return DB.Create(oauthInfo).Error
 }
 
-// IsOauthProviderExist 验证Oauth提供者是否存在
-func (os *OauthService) IsOauthProviderExist(op string) bool {
-	oauthInfo := &model.Oauth{}
-	// 使用 Gorm 的 Take 方法查找符合条件的记录
-	if err := DB.Where("op = ?", op).Take(oauthInfo).Error; err != nil {
-		return false
-	}
-	return true
-}
-
-// Create 创建
-func (os *OauthService) Create(oauthInfo *model.Oauth) error {
-	err := oauthInfo.FormatOauthInfo()
-	if err != nil {
-		return err
-	}
-	res := DB.Create(oauthInfo).Error
-	return res
-}
-func (os *OauthService) Delete(oauthInfo *model.Oauth) error {
-	return DB.Delete(oauthInfo).Error
-}
-
-// Update 更新
-func (os *OauthService) Update(oauthInfo *model.Oauth) error {
-	err := oauthInfo.FormatOauthInfo()
-	if err != nil {
-		return err
-	}
+func (svc *OauthService) Update(oauthInfo *model.Oauth) error {
 	return DB.Model(oauthInfo).Updates(oauthInfo).Error
 }
 
-// SeedGithubOauth 将配置(github-oauth.client-id/client-secret)中的 GitHub OAuth App 凭据
-// 同步到数据库(op=github)：不存在则创建(auto_register=true)，已存在且凭据变化则更新。
-// 用于密码登录移除后的引导：新实例无需登录后台即可让前端出现 GitHub 登录入口。
-func (os *OauthService) SeedGithubOauth() error {
+// SeedGithubOauth 将配置与环境变量中的 GitHub OAuth App 凭据同步到数据库
+func (svc *OauthService) SeedGithubOauth() error {
 	c := Config.GithubOauth
-	if c.ClientId == "" || c.ClientSecret == "" {
+	clientId := c.ClientId
+	clientSecret := c.ClientSecret
+	if envId := os.Getenv("RUSTDESK_API_GITHUB_OAUTH_CLIENT_ID"); envId != "" {
+		clientId = envId
+	}
+	if envSecret := os.Getenv("RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET"); envSecret != "" {
+		clientSecret = envSecret
+	}
+	if clientId == "" || clientSecret == "" {
 		return nil
 	}
-	oauthInfo := os.InfoByOp(model.OauthTypeGithub)
+	oauthInfo := svc.InfoByOp(model.OauthTypeGithub)
 	if oauthInfo.Id == 0 {
 		autoRegister := true
 		oauthInfo = &model.Oauth{
 			Op:           model.OauthTypeGithub,
 			OauthType:    model.OauthTypeGithub,
-			ClientId:     c.ClientId,
-			ClientSecret: c.ClientSecret,
+			ClientId:     clientId,
+			ClientSecret: clientSecret,
 			AutoRegister: &autoRegister,
 		}
-		if err := os.Create(oauthInfo); err != nil {
+		if err := svc.Create(oauthInfo); err != nil {
 			return err
 		}
 		if Logger != nil {
-			Logger.Info("github oauth provider seeded from config")
+			Logger.Info("github oauth provider seeded from config/env")
 		}
-	} else if oauthInfo.ClientId != c.ClientId || oauthInfo.ClientSecret != c.ClientSecret {
-		oauthInfo.ClientId = c.ClientId
-		oauthInfo.ClientSecret = c.ClientSecret
-		if err := os.Update(oauthInfo); err != nil {
+	} else if oauthInfo.ClientId != clientId || oauthInfo.ClientSecret != clientSecret {
+		oauthInfo.ClientId = clientId
+		oauthInfo.ClientSecret = clientSecret
+		if err := svc.Update(oauthInfo); err != nil {
 			return err
 		}
 		if Logger != nil {
-			Logger.Info("github oauth provider credentials updated from config")
+			Logger.Info("github oauth provider credentials updated from config/env")
 		}
 	}
 	return nil
 }
 
-// GetOauthProviders 获取所有的provider
-func (os *OauthService) GetOauthProviders() []string {
-	var res []string
-	DB.Model(&model.Oauth{}).Pluck("op", &res)
-	return res
+// GetOauthProviders 获取启用的提供商列表 (单用户模式仅支持 GitHub)
+func (svc *OauthService) GetOauthProviders() []string {
+	return []string{model.OauthTypeGithub}
 }
 
-// getGithubPrimaryEmail: Get the primary email of the user from Github
-func (os *OauthService) getGithubPrimaryEmail(client *http.Client, githubUser *model.GithubUser) error {
-	// the client is already set with the token
+// getGithubPrimaryEmail 获取用户的主邮箱
+func (svc *OauthService) getGithubPrimaryEmail(client *http.Client, githubUser *model.GithubUser) error {
 	resp, err := client.Get("https://api.github.com/user/emails")
 	if err != nil {
 		return fmt.Errorf("failed to fetch emails: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// check the response status code
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to fetch emails: %s", resp.Status)
 	}
 
-	// decode the response
 	var emails []struct {
 		Email    string `json:"email"`
 		Primary  bool   `json:"primary"`
@@ -619,7 +477,6 @@ func (os *OauthService) getGithubPrimaryEmail(client *http.Client, githubUser *m
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// find the primary verified email
 	for _, e := range emails {
 		if e.Primary && e.Verified {
 			githubUser.Email = e.Email
@@ -628,5 +485,5 @@ func (os *OauthService) getGithubPrimaryEmail(client *http.Client, githubUser *m
 		}
 	}
 
-	return fmt.Errorf("no primary verified email found")
+	return nil
 }

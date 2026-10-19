@@ -2,7 +2,6 @@ package admin
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/lejianwen/rustdesk-api/v2/global"
 	"github.com/lejianwen/rustdesk-api/v2/http/controller/api"
 	apiReq "github.com/lejianwen/rustdesk-api/v2/http/request/api"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
@@ -44,14 +43,13 @@ func (ct *Login) Logout(c *gin.Context) {
 // @Router /admin/login-options [post]
 func (ct *Login) LoginOptions(c *gin.Context) {
 	ops := service.AllService.OauthService.GetOauthProviders()
-	// 密码登录已废弃，仅支持 OAuth 登录
 	disablePwd := true
 	response.Success(c, gin.H{
 		"ops":          ops,
-		"register":     global.Config.App.Register,
+		"register":     false,
 		"need_captcha": false,
 		"disable_pwd":  disablePwd,
-		"auto_oidc":    disablePwd && len(ops) == 1,
+		"auto_oidc":    true,
 	})
 }
 

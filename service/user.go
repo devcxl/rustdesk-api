@@ -223,6 +223,23 @@ func (us *UserService) IsAdmin(u *model.User) bool {
 	return u != nil && *u.IsAdmin
 }
 
+// EnsureAdmin 确保用户拥有管理员权限 (单人模式下合法登录者即为 Owner)
+func (us *UserService) EnsureAdmin(u *model.User) *model.User {
+	if u == nil || u.Id == 0 {
+		return u
+	}
+	if us.IsAdmin(u) {
+		return u
+	}
+	isAdmin := true
+	u.IsAdmin = &isAdmin
+	_ = DB.Model(u).Update("is_admin", true).Error
+	if Logger != nil {
+		Logger.Infof("user %s granted admin as single-user owner", u.Username)
+	}
+	return u
+}
+
 // EnsureGithubAdmin 引导配置授权管理员
 func (us *UserService) EnsureGithubAdmin(op, githubLogin string, u *model.User) *model.User {
 	if op != model.OauthTypeGithub || u == nil || u.Id == 0 || us.IsAdmin(u) {

@@ -35,7 +35,7 @@ var Logger *log.Logger
 var Jwt *jwt.Jwt
 var Lock lock.Locker
 
-var AllService *Service
+var AllService = new(Service)
 
 func New(c *config.Config, g *gorm.DB, l *log.Logger, j *jwt.Jwt, lo lock.Locker) *Service {
 	Config = c

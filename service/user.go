@@ -13,7 +13,28 @@ import (
 	"gorm.io/gorm"
 )
 
+const DefaultOwnerUserId = 1
+
 type UserService struct {
+}
+
+// GetOwner 获取当前系统的 Owner 用户 (首位 Admin)
+func (us *UserService) GetOwner() *model.User {
+	u := &model.User{}
+	isAdmin := true
+	if err := DB.Where("is_admin = ?", &isAdmin).Order("id asc").First(u).Error; err == nil && u.Id > 0 {
+		return u
+	}
+	return us.InfoById(DefaultOwnerUserId)
+}
+
+// GetOwnerId 获取当前系统 Owner 的 ID
+func (us *UserService) GetOwnerId() uint {
+	u := us.GetOwner()
+	if u != nil && u.Id > 0 {
+		return u.Id
+	}
+	return DefaultOwnerUserId
 }
 
 // InfoById 根据用户id取用户信息
@@ -121,40 +142,13 @@ func (us *UserService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *
 	return
 }
 
-func (us *UserService) ListByIds(ids []uint) (res []*model.User) {
-	DB.Where("id in ?", ids).Find(&res)
-	return res
-}
-
-// ListByGroupId 根据组id取用户列表
-func (us *UserService) ListByGroupId(groupId, page, pageSize uint) (res *model.UserList) {
-	res = us.List(page, pageSize, func(tx *gorm.DB) {
-		tx.Where("group_id = ?", groupId)
-	})
-	return
-}
-
-// ListIdsByGroupId 根据组id取用户id列表
-func (us *UserService) ListIdsByGroupId(groupId uint) (ids []uint) {
-	DB.Model(&model.User{}).Where("group_id = ?", groupId).Pluck("id", &ids)
-	return ids
-
-}
-
-// ListIdAndNameByGroupId 根据组id取用户id和用户名列表
-func (us *UserService) ListIdAndNameByGroupId(groupId uint) (res []*model.User) {
-	DB.Model(&model.User{}).Where("group_id = ?", groupId).Select("id, username").Find(&res)
-	return res
-}
-
-// CheckUserEnable 判断用户是否禁用
+// CheckUserEnable 判断用户是否可用
 func (us *UserService) CheckUserEnable(u *model.User) bool {
 	return u.Status == model.COMMON_STATUS_ENABLE
 }
 
-// Create 创建
+// Create 创建用户
 func (us *UserService) Create(u *model.User) error {
-	// The initial username should be formatted, and the username should be unique
 	if us.IsUsernameExists(u.Username) {
 		return errors.New("UsernameExists")
 	}
@@ -164,8 +158,7 @@ func (us *UserService) Create(u *model.User) error {
 	if err != nil {
 		return err
 	}
-	res := DB.Create(u).Error
-	return res
+	return DB.Create(u).Error
 }
 
 // GetUuidByToken 根据token和user取uuid
@@ -191,48 +184,8 @@ func (us *UserService) Logout(u *model.User, token string) error {
 	return nil
 }
 
-// Delete 删除用户和oauth信息
-func (us *UserService) Delete(u *model.User) error {
-	userCount := us.getAdminUserCount()
-	if userCount <= 1 && us.IsAdmin(u) {
-		return errors.New("The last admin user cannot be deleted")
-	}
-	tx := DB.Begin()
-	// 删除用户
-	if err := tx.Delete(u).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	// 删除关联的 OAuth 信息
-	if err := tx.Where("user_id = ?", u.Id).Delete(&model.UserThird{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	//  删除关联的ab
-	if err := tx.Where("user_id = ?", u.Id).Delete(&model.AddressBook{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	tx.Commit()
-	// 删除关联的peer
-	if err := AllService.PeerService.EraseUserId(u.Id); err != nil {
-		Logger.Warn("User deleted successfully, but failed to unlink peer.")
-		return nil
-	}
-	return nil
-}
-
 // Update 更新
 func (us *UserService) Update(u *model.User) error {
-	currentUser := us.InfoById(u.Id)
-	// 如果当前用户是管理员并且 IsAdmin 不为空，进行检查
-	if us.IsAdmin(currentUser) {
-		adminCount := us.getAdminUserCount()
-		// 如果这是唯一的管理员，确保不能禁用或取消管理员权限
-		if adminCount <= 1 && (!us.IsAdmin(u) || u.Status == model.COMMON_STATUS_DISABLED) {
-			return errors.New("The last admin user cannot be disabled or demoted")
-		}
-	}
 	return DB.Model(u).Updates(u).Error
 }
 
@@ -246,7 +199,7 @@ func (us *UserService) FlushTokenByUuid(uuid string) error {
 	return DB.Where("device_uuid = ?", uuid).Delete(&model.UserToken{}).Error
 }
 
-// FlushTokenByUuids 清空token
+// FlushTokenByUuids 清空一组设备的 token
 func (us *UserService) FlushTokenByUuids(uuids []string) error {
 	return DB.Where("device_uuid in (?)", uuids).Delete(&model.UserToken{}).Error
 }
@@ -262,8 +215,7 @@ func (us *UserService) UpdatePassword(u *model.User, password string) error {
 	if err != nil {
 		return err
 	}
-	err = us.FlushToken(u)
-	return err
+	return us.FlushToken(u)
 }
 
 // IsAdmin 是否管理员
@@ -271,9 +223,7 @@ func (us *UserService) IsAdmin(u *model.User) bool {
 	return u != nil && *u.IsAdmin
 }
 
-// EnsureGithubAdmin 密码登录移除后的管理员引导：
-// 若 op 为 github 且 GitHub 登录名命中配置 github-oauth.admins，
-// 则将该用户提升为管理员（已管理员则无操作）。其余情况原样返回。
+// EnsureGithubAdmin 引导配置授权管理员
 func (us *UserService) EnsureGithubAdmin(op, githubLogin string, u *model.User) *model.User {
 	if op != model.OauthTypeGithub || u == nil || u.Id == 0 || us.IsAdmin(u) {
 		return u
@@ -295,12 +245,9 @@ func (us *UserService) EnsureGithubAdmin(op, githubLogin string, u *model.User) 
 	return u
 }
 
-// RouteNames
+// RouteNames 获取路由名称
 func (us *UserService) RouteNames(u *model.User) []string {
-	if us.IsAdmin(u) {
-		return model.AdminRouteNames
-	}
-	return model.UserRouteNames
+	return model.AdminRouteNames
 }
 
 // InfoByOauthId 根据oauth的name和openId取用户信息
@@ -316,10 +263,11 @@ func (us *UserService) InfoByOauthId(op string, openId string) *model.User {
 	return u
 }
 
-// RegisterByOauth 注册
+// RegisterByOauth 通过 OAuth 关联或创建账号
 func (us *UserService) RegisterByOauth(oauthUser *model.OauthUser, op string) (error, *model.User) {
 	Lock.Lock("registerByOauth")
 	defer Lock.UnLock("registerByOauth")
+
 	ut := AllService.OauthService.UserThirdInfo(op, oauthUser.OpenId)
 	if ut.Id != 0 {
 		return nil, us.InfoById(ut.UserId)
@@ -328,23 +276,12 @@ func (us *UserService) RegisterByOauth(oauthUser *model.OauthUser, op string) (e
 	if err != nil {
 		return err, nil
 	}
-	//check if this email has been registered
+
 	email := oauthUser.Email
-	// only email is not empty
 	if email != "" {
 		email = strings.ToLower(email)
-		// update email to oauthUser, in case it contain upper case
 		oauthUser.Email = email
-		// call this, if find user by email, it will update the email to local database
-		user, ldapErr := AllService.LdapService.GetUserInfoByEmailLocal(email)
-		// If we enable ldap, and the error is not ErrLdapUserNotFound, return the error because we could not sure if the user is not found in ldap
-		if !(errors.Is(ldapErr, ErrLdapNotEnabled) || errors.Is(ldapErr, ErrLdapUserNotFound) || ldapErr == nil) {
-			return ldapErr, user
-		}
-		if user.Id == 0 {
-			// this means the user is not found in ldap, maybe ldao is not enabled
-			user = us.InfoByEmail(email)
-		}
+		user := us.InfoByEmail(email)
 		if user.Id != 0 {
 			ut.FromOauthUser(user.Id, oauthUser, oauthType, op)
 			DB.Create(ut)
@@ -355,12 +292,13 @@ func (us *UserService) RegisterByOauth(oauthUser *model.OauthUser, op string) (e
 	tx := DB.Begin()
 	ut = &model.UserThird{}
 	ut.FromOauthUser(0, oauthUser, oauthType, op)
-	// The initial username should be formatted
 	username := us.formatUsername(oauthUser.Username)
 	usernameUnique := us.GenerateUsernameByOauth(username)
+	isAdmin := true
 	user := &model.User{
 		Username: usernameUnique,
 		GroupId:  1,
+		IsAdmin:  &isAdmin,
 	}
 	oauthUser.ToUser(user, false)
 	tx.Create(user)
@@ -377,7 +315,7 @@ func (us *UserService) RegisterByOauth(oauthUser *model.OauthUser, op string) (e
 // GenerateUsernameByOauth 生成用户名
 func (us *UserService) GenerateUsernameByOauth(name string) string {
 	for us.IsUsernameExists(name) {
-		name += strconv.Itoa(rand.Intn(10)) // Append a random digit (0-9)
+		name += strconv.Itoa(rand.Intn(10))
 	}
 	return name
 }
@@ -394,7 +332,7 @@ func (us *UserService) UserThirdInfo(userId uint, op string) *model.UserThird {
 	return ut
 }
 
-// IsPasswordEmptyById 根据用户id判断密码是否为空，主要用于第三方登录的自动注册
+// IsPasswordEmptyById 根据用户id判断密码是否为空
 func (us *UserService) IsPasswordEmptyById(id uint) bool {
 	u := &model.User{}
 	if DB.Where("id = ?", id).First(u).Error != nil {
@@ -403,87 +341,22 @@ func (us *UserService) IsPasswordEmptyById(id uint) bool {
 	return u.Password == ""
 }
 
-// IsPasswordEmptyByUsername 根据用户id判断密码是否为空，主要用于第三方登录的自动注册
-func (us *UserService) IsPasswordEmptyByUsername(username string) bool {
-	u := &model.User{}
-	if DB.Where("username = ?", username).First(u).Error != nil {
-		return false
-	}
-	return u.Password == ""
-}
-
-// IsPasswordEmptyByUser 判断密码是否为空，主要用于第三方登录的自动注册
+// IsPasswordEmptyByUser 判断密码是否为空
 func (us *UserService) IsPasswordEmptyByUser(u *model.User) bool {
 	return us.IsPasswordEmptyById(u.Id)
 }
 
-// Register 注册, 如果用户名已存在则返回nil
-func (us *UserService) Register(username string, email string, password string, status model.StatusCode) *model.User {
-	u := &model.User{
-		Username: username,
-		Email:    email,
-		Password: password,
-		GroupId:  1,
-		Status:   status,
-	}
-	err := us.Create(u)
-	if err != nil {
-		return nil
-	}
-	return u
-}
-
-func (us *UserService) TokenList(page uint, size uint, f func(tx *gorm.DB)) *model.UserTokenList {
-	res := &model.UserTokenList{}
-	res.Page = int64(page)
-	res.PageSize = int64(size)
-	tx := DB.Model(&model.UserToken{})
-	if f != nil {
-		f(tx)
-	}
-	tx.Count(&res.Total)
-	tx.Scopes(Paginate(page, size))
-	tx.Find(&res.UserTokens)
-	return res
-}
-
-func (us *UserService) TokenInfoById(id uint) *model.UserToken {
-	ut := &model.UserToken{}
-	DB.Where("id = ?", id).First(ut)
-	return ut
-}
-
-func (us *UserService) DeleteToken(l *model.UserToken) error {
-	return DB.Delete(l).Error
-}
-
-// Helper functions, used for formatting username
 func (us *UserService) formatUsername(username string) string {
 	username = strings.ReplaceAll(username, " ", "")
 	username = strings.ToLower(username)
 	return username
 }
 
-// Helper functions, getUserCount
-func (us *UserService) getUserCount() int64 {
-	var count int64
-	DB.Model(&model.User{}).Count(&count)
-	return count
-}
-
-// helper functions, getAdminUserCount
-func (us *UserService) getAdminUserCount() int64 {
-	var count int64
-	DB.Model(&model.User{}).Where("is_admin = ?", true).Count(&count)
-	return count
-}
-
 // UserTokenExpireTimestamp 生成用户token过期时间
 func (us *UserService) UserTokenExpireTimestamp() int64 {
 	exp := Config.App.TokenExpire
 	if exp == 0 {
-		//默认七天
-		exp = 604800
+		exp = 7 * 24 * time.Hour
 	}
 	return time.Now().Add(exp).Unix()
 }
@@ -499,25 +372,17 @@ func (us *UserService) AutoRefreshAccessToken(ut *model.UserToken) {
 	}
 }
 
-func (us *UserService) BatchDeleteUserToken(ids []uint) error {
-	return DB.Where("id in ?", ids).Delete(&model.UserToken{}).Error
-}
-
 func (us *UserService) VerifyJWT(token string) (uint, error) {
 	return Jwt.ParseToken(token)
 }
 
-// IsUsernameExists 判断用户名是否存在, it will check the internal database and LDAP(if enabled)
+// IsUsernameExists 判断用户名是否存在
 func (us *UserService) IsUsernameExists(username string) bool {
-	return us.IsUsernameExistsLocal(username) || AllService.LdapService.IsUsernameExists(username)
+	return us.IsUsernameExistsLocal(username)
 }
 
 func (us *UserService) IsUsernameExistsLocal(username string) bool {
 	u := &model.User{}
 	DB.Where("username = ?", username).First(u)
 	return u.Id != 0
-}
-
-func (us *UserService) IsEmailExistsLdap(email string) bool {
-	return AllService.LdapService.IsEmailExists(email)
 }

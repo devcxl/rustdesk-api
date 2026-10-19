@@ -52,11 +52,9 @@ type Config struct {
 	Logger      Logger
 	Redis       Redis
 	Cache       Cache
-	Oss         Oss
 	Jwt         Jwt
 	Rustdesk    Rustdesk
 	Proxy       Proxy
-	Ldap        Ldap
 	GithubOauth GithubOauthAccess `mapstructure:"github-oauth"`
 }
 

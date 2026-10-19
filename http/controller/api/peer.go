@@ -32,9 +32,10 @@ func (p *Peer) SysInfo(c *gin.Context) {
 	}
 	fpe := f.ToPeer()
 	pe := service.AllService.PeerService.FindById(f.Id)
+	ownerId := service.AllService.UserService.GetOwnerId()
 	if pe.RowId == 0 {
 		pe = f.ToPeer()
-		pe.UserId = 1
+		pe.UserId = ownerId
 		err = service.AllService.PeerService.Create(pe)
 		if err != nil {
 			response.Error(c, response.TranslateMsg(c, "OperationFailed")+err.Error())
@@ -42,7 +43,7 @@ func (p *Peer) SysInfo(c *gin.Context) {
 		}
 	} else {
 		if pe.UserId == 0 {
-			pe.UserId = 1
+			pe.UserId = ownerId
 		}
 		fpe.RowId = pe.RowId
 		fpe.UserId = pe.UserId

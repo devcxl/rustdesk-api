@@ -87,7 +87,8 @@ Navigate to `http://your-ip:21114/_admin` in your browser, click "Login with Git
 | `RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth App Client Secret | `6789abcd...` |
 | `RUSTDESK_API_RUSTDESK_ID_SERVER` | RustDesk ID Server host & port | `rustdesk.example.com:21116` |
 | `RUSTDESK_API_RUSTDESK_RELAY_SERVER` | RustDesk Relay Server host & port | `rustdesk.example.com:21117` |
-| `RUSTDESK_API_RUSTDESK_KEY` | Public Key | `rU5tD3sK...=` |
+| `RUSTDESK_API_RUSTDESK_KEY` | Public Key content (Either this or KEY_FILE) | `rU5tD3sK...=` |
+| `RUSTDESK_API_RUSTDESK_KEY_FILE` | Public key file path (supports short alias `KEY_FILE` and auto-probe) | `/app/data/id_ed25519.pub` |
 | `RUSTDESK_API_RUSTDESK_API_SERVER` | API Server Host (Default: current host) | `https://api.example.com` |
 
 ---

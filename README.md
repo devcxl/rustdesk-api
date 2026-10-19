@@ -93,7 +93,8 @@ docker compose up -d
 | `RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth 应用 Client Secret | `6789abcd...` |
 | `RUSTDESK_API_RUSTDESK_ID_SERVER` | RustDesk ID 服务器地址与端口 | `rustdesk.example.com:21116` |
 | `RUSTDESK_API_RUSTDESK_RELAY_SERVER` | RustDesk 中继服务器地址与端口 | `rustdesk.example.com:21117` |
-| `RUSTDESK_API_RUSTDESK_KEY` | 服务端公钥 Key | `rU5tD3sK...=` |
+| `RUSTDESK_API_RUSTDESK_KEY` | 服务端公钥 Key 内容（与 KEY_FILE 二选一） | `rU5tD3sK...=` |
+| `RUSTDESK_API_RUSTDESK_KEY_FILE` | 公钥文件路径（支持 Docker 挂载自动读取，支持短别名 `KEY_FILE`） | `/app/data/id_ed25519.pub` |
 | `RUSTDESK_API_RUSTDESK_API_SERVER` | API 服务器地址（可选，默认当前主机） | `https://api.example.com` |
 
 ---

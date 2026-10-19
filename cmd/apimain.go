@@ -243,7 +243,7 @@ func Migrate(version uint) {
 		global.Logger.Error("migrate err :=>", err)
 	}
 	global.DB.Create(&model.Version{Version: version})
-	//如果是初次则创建一个默认用户
+	//如果是初次则创建一个默认组
 	var vc int64
 	global.DB.Model(&model.Version{}).Count(&vc)
 	if vc == 1 {
@@ -256,25 +256,6 @@ func Migrate(version uint) {
 			Type: model.GroupTypeDefault,
 		}
 		service.AllService.GroupService.Create(group)
-
-		is_admin := true
-		admin := &model.User{
-			Username: "admin",
-			Nickname: "Admin",
-			Status:   model.COMMON_STATUS_ENABLE,
-			IsAdmin:  &is_admin,
-			GroupId:  1,
-		}
-
-		// 生成随机密码
-		pwd := utils.RandomString(8)
-		global.Logger.Info("Admin Password Is: ", pwd)
-		var err error
-		admin.Password, err = utils.EncryptPassword(pwd)
-		if err != nil {
-			global.Logger.Fatalf("failed to generate admin password: %v", err)
-		}
-		global.DB.Create(admin)
 	}
 
 }

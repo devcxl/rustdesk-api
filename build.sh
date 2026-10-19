@@ -31,6 +31,17 @@ else
     echo "Skipping Swagger documentation generation due to DOCS is empty."
 fi
 
+# Build admin frontend if admin directory exists
+if [ -d "admin" ]; then
+    if command -v pnpm &> /dev/null; then
+        echo "Building admin frontend..."
+        (cd admin && pnpm install --frozen-lockfile && pnpm build)
+    elif command -v npm &> /dev/null; then
+        echo "Building admin frontend using npm..."
+        (cd admin && npm install && npm run build)
+    fi
+fi
+
 # Compile the Go code and output it to the release directory
 go build -o release/apimain cmd/apimain.go
 

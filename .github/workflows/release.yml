@@ -14,9 +14,42 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/rustdesk-api
 
 jobs:
+  # 前端单独构建一次，供所有平台打包复用
+  frontend:
+    name: Build Admin Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'admin/pnpm-lock.yaml'
+
+      - name: Build admin frontend
+        working-directory: admin
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          path: resources/admin/
+
   # 原生构建产物：四平台打包并上传到 GitHub Release
   build:
     name: Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+    needs: frontend
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -30,30 +63,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-dist
+          path: resources/admin/
+
       - name: Set up Go environment
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-
-      - name: Set up npm
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Get tag version
         run: |
           TAG_VERSION="${GITHUB_REF##*/}"
           VERSION="${TAG_VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Build rustdesk-api-web (admin frontend)
-        run: |
-          git clone --depth 1 https://github.com/lejianwen/rustdesk-api-web.git rustdesk-api-web
-          cd rustdesk-api-web
-          npm install
-          npm run build
-          mkdir -p ../resources/admin/
-          cp -ar dist/* ../resources/admin/
 
       - name: Write version to resources/version
         run: echo $VERSION > resources/version
@@ -98,6 +123,7 @@ jobs:
             ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}}
 
       - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
@@ -145,7 +171,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           else
-            echo "TAG=test" >> $GITHUB_ENV
+            echo "TAG=latest" >> $GITHUB_ENV
           fi
 
       - name: Set up QEMU

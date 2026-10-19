@@ -5,10 +5,11 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 jobs:
   test:
-    name: Vet & Test
+    name: Code Quality & Build Check
     runs-on: ubuntu-latest
     services:
       redis:
@@ -37,8 +38,32 @@ jobs:
       - name: Test
         run: go test -v ./...
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'admin/pnpm-lock.yaml'
+
+      - name: Build admin frontend
+        working-directory: admin
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Verify Go Build
+        run: go build -o /dev/null ./cmd/apimain.go
+
+  # 4 架构全量交叉编译仅在合并入 master 或手动触发时执行，加速 PR 反馈
   build:
-    name: Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+    name: Cross-Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
+    needs: test
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

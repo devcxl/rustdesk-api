@@ -2,6 +2,11 @@
 runtime/*
 !runtime
 !runtime/cache/.gitkeep
-resources/admin
 release
 data/rustdeskapi.db
+
+# Frontend
+admin/node_modules
+admin/dist
+admin/.vite
+admin/.pnpm-debug.log*

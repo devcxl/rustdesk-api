@@ -67,21 +67,32 @@ func (us *UserService) GenerateToken(u *model.User) string {
 	return utils.Md5(u.Username + time.Now().String())
 }
 
+type LoginParams struct {
+	DeviceUuid string
+	DeviceId   string
+	Client     string
+	Platform   string
+	Ip         string
+}
+
 // Login 登录
-func (us *UserService) Login(u *model.User, llog *model.LoginLog) *model.UserToken {
+func (us *UserService) Login(u *model.User, p *LoginParams) *model.UserToken {
 	token := us.GenerateToken(u)
+	var uuid, devId string
+	if p != nil {
+		uuid = p.DeviceUuid
+		devId = p.DeviceId
+	}
 	ut := &model.UserToken{
 		UserId:     u.Id,
 		Token:      token,
-		DeviceUuid: llog.Uuid,
-		DeviceId:   llog.DeviceId,
+		DeviceUuid: uuid,
+		DeviceId:   devId,
 		ExpiredAt:  us.UserTokenExpireTimestamp(),
 	}
 	DB.Create(ut)
-	llog.UserTokenId = ut.UserId
-	DB.Create(llog)
-	if llog.Uuid != "" {
-		AllService.PeerService.UuidBindUserId(llog.DeviceId, llog.Uuid, u.Id)
+	if uuid != "" {
+		AllService.PeerService.UuidBindUserId(devId, uuid, u.Id)
 	}
 	return ut
 }
@@ -199,16 +210,6 @@ func (us *UserService) Delete(u *model.User) error {
 	}
 	//  删除关联的ab
 	if err := tx.Where("user_id = ?", u.Id).Delete(&model.AddressBook{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	//  删除关联的abc
-	if err := tx.Where("user_id = ?", u.Id).Delete(&model.AddressBookCollection{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	//  删除关联的abcr
-	if err := tx.Where("user_id = ?", u.Id).Delete(&model.AddressBookCollectionRule{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -391,13 +392,6 @@ func (us *UserService) UserThirdInfo(userId uint, op string) *model.UserThird {
 	ut := &model.UserThird{}
 	DB.Where("user_id = ? and op = ?", userId, op).First(ut)
 	return ut
-}
-
-// FindLatestUserIdFromLoginLogByUuid 根据uuid和设备id查找最后登录的用户id
-func (us *UserService) FindLatestUserIdFromLoginLogByUuid(uuid string, deviceId string) uint {
-	llog := &model.LoginLog{}
-	DB.Where("uuid = ? and device_id = ?", uuid, deviceId).Order("id desc").First(llog)
-	return llog.UserId
 }
 
 // IsPasswordEmptyById 根据用户id判断密码是否为空，主要用于第三方登录的自动注册

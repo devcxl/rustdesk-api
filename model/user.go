@@ -29,7 +29,5 @@ type UserList struct {
 	Pagination
 }
 
-var UserRouteNames = []string{
-	"MyTagList", "MyAddressBookList", "MyInfo", "MyAddressBookCollection", "MyPeer", "MyShareRecordList", "MyLoginLog",
-}
+var UserRouteNames = []string{"*"}
 var AdminRouteNames = []string{"*"}

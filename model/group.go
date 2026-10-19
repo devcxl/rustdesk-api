@@ -1,8 +1,8 @@
 package model
 
 const (
-	GroupTypeDefault = 1 // 默认
-	GroupTypeShare   = 2 // 共享
+	GroupTypeDefault = 1
+	GroupTypeShare   = 2
 )
 
 type Group struct {
@@ -14,16 +14,5 @@ type Group struct {
 
 type GroupList struct {
 	Groups []*Group `json:"list"`
-	Pagination
-}
-
-type DeviceGroup struct {
-	IdModel
-	Name string `json:"name" gorm:"default:'';not null;"`
-	TimeModel
-}
-
-type DeviceGroupList struct {
-	DeviceGroups []*DeviceGroup `json:"list"`
 	Pagination
 }

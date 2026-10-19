@@ -249,14 +249,6 @@ func Migrate(version uint) {
 		&model.Group{},
 		&model.UserThird{},
 		&model.Oauth{},
-		&model.LoginLog{},
-		&model.ShareRecord{},
-		&model.AuditConn{},
-		&model.AuditFile{},
-		&model.AddressBookCollection{},
-		&model.AddressBookCollectionRule{},
-		&model.ServerCmd{},
-		&model.DeviceGroup{},
 	)
 	if err != nil {
 		global.Logger.Error("migrate err :=>", err)
@@ -276,15 +268,6 @@ func Migrate(version uint) {
 		}
 		service.AllService.GroupService.Create(group)
 
-		shareGroup, _ := localizer.LocalizeMessage(&i18n.Message{
-			ID: "ShareGroup",
-		})
-		groupShare := &model.Group{
-			Name: shareGroup,
-			Type: model.GroupTypeShare,
-		}
-		service.AllService.GroupService.Create(groupShare)
-		//是true
 		is_admin := true
 		admin := &model.User{
 			Username: "admin",

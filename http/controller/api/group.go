@@ -1,119 +1,45 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	apiReq "github.com/lejianwen/rustdesk-api/v2/http/request/api"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
 	apiResp "github.com/lejianwen/rustdesk-api/v2/http/response/api"
-	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
-	"net/http"
 )
 
 type Group struct {
 }
 
-// Users 用户列表
-// @Tags 群组
-// @Summary 用户列表
-// @Description 用户列表
-// @Accept  json
-// @Produce  json
-// @Param page query int false "页码"
-// @Param pageSize query int false "每页数量"
-// @Param status query int false "状态"
-// @Param accessible query string false "accessible"
-// @Success 200 {object} response.DataResponse{data=[]apiResp.UserPayload}
-// @Failure 500 {object} response.ErrorResponse
-// @Router /users [get]
-// @Security BearerAuth
+// Users 用户列表 (单人模式仅返回当前用户)
 func (g *Group) Users(c *gin.Context) {
-	q := &apiReq.UserListQuery{}
-	err := c.ShouldBindQuery(&q)
-	if err != nil {
-		response.Error(c, err.Error())
-		return
-	}
 	u := service.AllService.UserService.CurUser(c)
-	gr := service.AllService.GroupService.InfoById(u.GroupId)
-	userList := &model.UserList{}
-	if !*u.IsAdmin && gr.Type != model.GroupTypeShare {
-		//仅能获取到自己
-		userList.Users = append(userList.Users, u)
-		userList.Total = 1
-	} else {
-		userList = service.AllService.UserService.ListByGroupId(u.GroupId, q.Page, q.PageSize)
-	}
-
-	data := make([]*apiResp.UserPayload, 0, len(userList.Users))
-	for _, user := range userList.Users {
+	data := make([]*apiResp.UserPayload, 0, 1)
+	if u != nil {
 		up := &apiResp.UserPayload{}
-		up.FromUser(user)
+		up.FromUser(u)
 		data = append(data, up)
 	}
 	c.JSON(http.StatusOK, response.DataResponse{
-		Total: uint(userList.Total),
+		Total: uint(len(data)),
 		Data:  data,
 	})
 }
 
-// Peers
-// @Tags 群组
-// @Summary 机器
-// @Description 机器
-// @Accept  json
-// @Produce  json
-// @Param page query int false "页码"
-// @Param pageSize query int false "每页数量"
-// @Param status query int false "状态"
-// @Param accessible query string false "accessible"
-// @Success 200 {object} response.DataResponse
-// @Failure 500 {object} response.Response
-// @Router /peers [get]
-// @Security BearerAuth
+// Peers 机器 (单人模式返回个人设备列表)
 func (g *Group) Peers(c *gin.Context) {
 	u := service.AllService.UserService.CurUser(c)
 	q := &apiReq.PeerListQuery{}
-	err := c.ShouldBindQuery(&q)
-	if err != nil {
-		response.Error(c, err.Error())
-		return
-	}
-	gr := service.AllService.GroupService.InfoById(u.GroupId)
-	users := make([]*model.User, 0, 1)
-	if !*u.IsAdmin && gr.Type != model.GroupTypeShare {
-		//仅能获取到自己
-		users = append(users, u)
-	} else {
-		users = service.AllService.UserService.ListIdAndNameByGroupId(u.GroupId)
-	}
+	_ = c.ShouldBindQuery(&q)
 
-	namesById := make(map[uint]string, len(users))
-	userIds := make([]uint, 0, len(users))
-	for _, user := range users {
-		namesById[user.Id] = user.Username
-		userIds = append(userIds, user.Id)
-	}
-	dGroupNameById := make(map[uint]string)
-	allGroup := service.AllService.GroupService.DeviceGroupList(1, 999, nil)
-	for _, group := range allGroup.DeviceGroups {
-		dGroupNameById[group.Id] = group.Name
-	}
-	peerList := service.AllService.PeerService.ListByUserIds(userIds, q.Page, q.PageSize)
+	peerList := service.AllService.PeerService.ListByUserId(u.Id, q.Page, q.PageSize)
 	data := make([]*apiResp.GroupPeerPayload, 0, len(peerList.Peers))
 	for _, peer := range peerList.Peers {
-		uname, ok := namesById[peer.UserId]
-		if !ok {
-			uname = ""
-		}
-		dGroupName, ok2 := dGroupNameById[peer.GroupId]
-		if !ok2 {
-			dGroupName = ""
-		}
 		pp := &apiResp.GroupPeerPayload{}
-		pp.FromPeer(peer, uname, dGroupName)
+		pp.FromPeer(peer, u.Username, "")
 		data = append(data, pp)
-
 	}
 	c.JSON(http.StatusOK, response.DataResponse{
 		Total: uint(peerList.Total),
@@ -121,30 +47,10 @@ func (g *Group) Peers(c *gin.Context) {
 	})
 }
 
-// Device
-// @Tags 群组
-// @Summary 设备
-// @Description 机器
-// @Accept  json
-// @Produce  json
-// @Param page query int false "页码"
-// @Param pageSize query int false "每页数量"
-// @Param status query int false "状态"
-// @Param accessible query string false "accessible"
-// @Success 200 {object} response.DataResponse
-// @Failure 500 {object} response.Response
-// @Router /device-group/accessible [get]
-// @Security BearerAuth
+// Device 设备组 (单人模式直接返回空)
 func (g *Group) Device(c *gin.Context) {
-	u := service.AllService.UserService.CurUser(c)
-	if !service.AllService.UserService.IsAdmin(u) {
-		response.Error(c, "Permission denied")
-		return
-	}
-	allGroup := service.AllService.GroupService.DeviceGroupList(1, 999, nil)
-
 	c.JSON(http.StatusOK, response.DataResponse{
 		Total: 0,
-		Data:  allGroup.DeviceGroups,
+		Data:  []interface{}{},
 	})
 }

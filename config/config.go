@@ -2,13 +2,9 @@ package config
 
 import (
 	"fmt"
-	"reflect"
-	"strconv"
+	"github.com/spf13/viper"
 	"strings"
 	"time"
-
-	"github.com/mitchellh/mapstructure"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -101,13 +97,7 @@ func Init(rowVal *Config, path string) *viper.Viper {
 				rowVal.Rustdesk.ParsePort()
 			})
 	*/
-	decodeHook := viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
-		durationDecodeHook(),
-		mapstructure.StringToTimeDurationHookFunc(),
-		mapstructure.StringToSliceHookFunc(","),
-	))
-
-	if err := v.Unmarshal(rowVal, decodeHook); err != nil {
+	if err := v.Unmarshal(rowVal); err != nil {
 		panic(fmt.Errorf("Fatal error config: %s \n", err))
 	}
 	rowVal.Rustdesk.LoadKeyFile()
@@ -115,53 +105,11 @@ func Init(rowVal *Config, path string) *viper.Viper {
 	return v
 }
 
-// durationDecodeHook 兼容不带单位的纯数字时长环境变量（如 "168" 自动解析为 168h）
-func durationDecodeHook() mapstructure.DecodeHookFunc {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data interface{}) (interface{}, error) {
-		if t != reflect.TypeOf(time.Duration(0)) {
-			return data, nil
-		}
-
-		switch f.Kind() {
-		case reflect.String:
-			s := strings.TrimSpace(data.(string))
-			if s == "" {
-				return time.Duration(0), nil
-			}
-			d, err := time.ParseDuration(s)
-			if err == nil {
-				return d, nil
-			}
-			// 纯数字无单位时默认按小时解析（例如 "168" -> 168h）
-			if num, err2 := strconv.ParseInt(s, 10, 64); err2 == nil {
-				return time.Duration(num) * time.Hour, nil
-			}
-			return nil, err
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			num := reflect.ValueOf(data).Int()
-			return time.Duration(num) * time.Hour, nil
-		case reflect.Float32, reflect.Float64:
-			num := reflect.ValueOf(data).Float()
-			return time.Duration(num) * time.Hour, nil
-		default:
-			return data, nil
-		}
-	}
-}
-
 // ReadEnv 读取环境变量
 func ReadEnv(rowVal interface{}) *viper.Viper {
 	v := viper.New()
 	v.AutomaticEnv()
-	decodeHook := viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
-		durationDecodeHook(),
-		mapstructure.StringToTimeDurationHookFunc(),
-		mapstructure.StringToSliceHookFunc(","),
-	))
-	if err := v.Unmarshal(rowVal, decodeHook); err != nil {
+	if err := v.Unmarshal(rowVal); err != nil {
 		fmt.Println(err)
 	}
 	return v

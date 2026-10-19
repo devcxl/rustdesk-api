@@ -1,8 +1,9 @@
 package api
 
 import (
-	"github.com/lejianwen/rustdesk-api/v2/model"
 	"time"
+
+	"github.com/lejianwen/rustdesk-api/v2/model"
 )
 
 type WebClientPeerPayload struct {
@@ -22,25 +23,11 @@ type WebClientPeerInfoPayload struct {
 
 func (wcpp *WebClientPeerPayload) FromAddressBook(a *model.AddressBook) {
 	wcpp.ViewStyle = "shrink"
-	//24小时前
 	wcpp.Tm = time.Now().Add(-time.Hour * 24).UnixNano()
 	wcpp.Info = WebClientPeerInfoPayload{
 		Username: a.Username,
 		Hostname: a.Hostname,
 		Platform: a.Platform,
 		Hash:     a.Hash,
-	}
-}
-
-func (wcpp *WebClientPeerPayload) FromShareRecord(sr *model.ShareRecord) {
-	wcpp.ViewStyle = "shrink"
-	//24小时前
-	wcpp.Tm = time.Now().UnixNano()
-	wcpp.Tmppwd = sr.Password
-	wcpp.Info = WebClientPeerInfoPayload{
-		Username: "",
-		Hostname: "",
-		Platform: "",
-		Id:       sr.PeerId,
 	}
 }

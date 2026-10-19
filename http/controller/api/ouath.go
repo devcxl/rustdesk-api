@@ -95,15 +95,13 @@ func (o *Oauth) OidcAuthQueryPre(c *gin.Context) (*model.User, *model.UserToken)
 	// 删除 OAuth 缓存
 	service.AllService.OauthService.DeleteOauthCache(q.Code)
 
-	// 创建登录日志并生成用户令牌
-	ut = service.AllService.UserService.Login(u, &model.LoginLog{
-		UserId:   u.Id,
-		Client:   v.DeviceType,
-		DeviceId: v.Id,
-		Uuid:     v.Uuid,
-		Ip:       c.ClientIP(),
-		Type:     model.LoginLogTypeOauth,
-		Platform: v.DeviceOs,
+	// 生成用户令牌
+	ut = service.AllService.UserService.Login(u, &service.LoginParams{
+		DeviceId:   v.Id,
+		DeviceUuid: v.Uuid,
+		Client:     v.DeviceType,
+		Platform:   v.DeviceOs,
+		Ip:         c.ClientIP(),
 	})
 
 	if ut == nil {
@@ -245,7 +243,7 @@ func (o *Oauth) OauthCallback(c *gin.Context) {
 		oauthCache.UserId = user.Id
 		oauthService.SetOauthCache(cacheKey, oauthCache, 0)
 		// 如果是webadmin，登录成功后跳转到webadmin
-		if oauthCache.DeviceType == model.LoginLogClientWebAdmin {
+		if oauthCache.DeviceType == "webadmin" {
 			/*service.AllService.UserService.Login(u, &model.LoginLog{
 				UserId:   u.Id,
 				Client:   "webadmin",

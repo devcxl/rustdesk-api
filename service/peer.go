@@ -91,6 +91,11 @@ func (ps *PeerService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *
 	return
 }
 
+// ListByUserId 根据用户id获取Peer列表
+func (ps *PeerService) ListByUserId(userId, page, pageSize uint) (res *model.PeerList) {
+	return ps.ListFilterByUserId(page, pageSize, nil, userId)
+}
+
 // ListFilterByUserId 根据用户id过滤Peer列表
 func (ps *PeerService) ListFilterByUserId(page, pageSize uint, where func(tx *gorm.DB), userId uint) (res *model.PeerList) {
 	userWhere := func(tx *gorm.DB) {

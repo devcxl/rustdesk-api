@@ -646,86 +646,6 @@
                 }
             }
         },
-        "/audit/conn": {
-            "post": {
-                "description": "审计连接",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "审计"
-                ],
-                "summary": "审计连接",
-                "parameters": [
-                    {
-                        "description": "审计连接",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.AuditConnForm"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/audit/file": {
-            "post": {
-                "description": "审计文件",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "审计"
-                ],
-                "summary": "审计文件",
-                "parameters": [
-                    {
-                        "description": "审计文件",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.AuditFileForm"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/currentUser": {
             "get": {
                 "security": [
@@ -760,66 +680,6 @@
                 }
             }
         },
-        "/device-group/accessible": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "机器",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "群组"
-                ],
-                "summary": "设备",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "状态",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "accessible",
-                        "name": "accessible",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.DataResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/heartbeat": {
             "post": {
                 "description": "心跳",
@@ -841,46 +701,6 @@
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/login": {
-            "post": {
-                "description": "登录",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "登录"
-                ],
-                "summary": "登录",
-                "parameters": [
-                    {
-                        "description": "登录表单",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.LoginForm"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.LoginRes"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1034,66 +854,6 @@
                 }
             }
         },
-        "/peers": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "机器",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "群组"
-                ],
-                "summary": "机器",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "状态",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "accessible",
-                        "name": "accessible",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.DataResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/server-config": {
             "get": {
                 "security": [
@@ -1146,35 +906,6 @@
                     "WEBCLIENT_V2"
                 ],
                 "summary": "服务配置",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/shared-peer": {
-            "post": {
-                "description": "分享的peer",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "WEBCLIENT"
-                ],
-                "summary": "分享的peer",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1260,81 +991,6 @@
                 }
             }
         },
-        "/users": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "用户列表",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "群组"
-                ],
-                "summary": "用户列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "状态",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "accessible",
-                        "name": "accessible",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.DataResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/api.UserPayload"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/version": {
             "get": {
                 "description": "版本",
@@ -1372,111 +1028,6 @@
                 "data": {
                     "type": "string",
                     "example": "{\"tags\":[\"tag1\",\"tag2\",\"tag3\"],\"peers\":[{\"id\":\"abc\",\"username\":\"abv-l\",\"hostname\":\"\",\"platform\":\"Windows\",\"alias\":\"\",\"tags\":[\"tag1\",\"tag2\"],\"hash\":\"hash\"}],\"tag_colors\":\"{\\\"tag1\\\":4288585374,\\\"tag2\\\":4278238420,\\\"tag3\\\":4291681337}\"}"
-                }
-            }
-        },
-        "api.AuditConnForm": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string"
-                },
-                "conn_id": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "ip": {
-                    "type": "string"
-                },
-                "peer": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "session_id": {
-                    "type": "number"
-                },
-                "type": {
-                    "type": "integer"
-                },
-                "uuid": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.AuditFileForm": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "info": {
-                    "type": "string"
-                },
-                "is_file": {
-                    "type": "boolean"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "peer_id": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "integer"
-                },
-                "uuid": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.DeviceInfoInLogin": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "os": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.LoginForm": {
-            "type": "object",
-            "required": [
-                "username"
-            ],
-            "properties": {
-                "autoLogin": {
-                    "type": "boolean"
-                },
-                "deviceInfo": {
-                    "$ref": "#/definitions/api.DeviceInfoInLogin"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "maxLength": 32,
-                    "minLength": 4
-                },
-                "type": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "maxLength": 32,
-                    "minLength": 2
-                },
-                "uuid": {
-                    "type": "string"
                 }
             }
         },
@@ -1553,40 +1104,13 @@
                 }
             }
         },
-        "model.AddressBookCollection": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
         "model.Tag": {
             "type": "object",
             "properties": {
-                "collection": {
-                    "$ref": "#/definitions/model.AddressBookCollection"
-                },
                 "collection_id": {
                     "type": "integer"
                 },
                 "color": {
-                    "description": "color 是flutter的颜色值,从0x00000000 到 0xFFFFFFFF; 前两位表示透明度，后面6位表示颜色, 可以转成rgba",
                     "type": "integer"
                 },
                 "created_at": {
@@ -1621,15 +1145,6 @@
                 "page_size": {
                     "type": "integer"
                 },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.DataResponse": {
-            "type": "object",
-            "properties": {
-                "data": {},
                 "total": {
                     "type": "integer"
                 }

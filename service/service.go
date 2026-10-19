@@ -18,11 +18,6 @@ type Service struct {
 	*PeerService
 	*GroupService
 	*OauthService
-	*LoginLogService
-	*AuditService
-	*ShareRecordService
-	*ServerCmdService
-	*LdapService
 	*AppService
 }
 

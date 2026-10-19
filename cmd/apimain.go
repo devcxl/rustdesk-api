@@ -14,7 +14,6 @@ import (
 	"github.com/lejianwen/rustdesk-api/v2/lib/lock"
 	"github.com/lejianwen/rustdesk-api/v2/lib/logger"
 	"github.com/lejianwen/rustdesk-api/v2/lib/orm"
-	"github.com/lejianwen/rustdesk-api/v2/lib/upload"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"github.com/lejianwen/rustdesk-api/v2/utils"
@@ -131,16 +130,6 @@ func InitGlobal() {
 	//validator
 	global.ApiInitValidator()
 
-	//oss
-	global.Oss = &upload.Oss{
-		AccessKeyId:     global.Config.Oss.AccessKeyId,
-		AccessKeySecret: global.Config.Oss.AccessKeySecret,
-		Host:            global.Config.Oss.Host,
-		CallbackUrl:     global.Config.Oss.CallbackUrl,
-		ExpireTime:      global.Config.Oss.ExpireTime,
-		MaxByte:         global.Config.Oss.MaxByte,
-	}
-
 	//jwt
 	//fmt.Println(global.Config.Jwt.PrivateKey)
 	global.Jwt = jwt.NewJwt(global.Config.Jwt.Key, global.Config.Jwt.ExpireDuration)
@@ -249,14 +238,6 @@ func Migrate(version uint) {
 		&model.Group{},
 		&model.UserThird{},
 		&model.Oauth{},
-		&model.LoginLog{},
-		&model.ShareRecord{},
-		&model.AuditConn{},
-		&model.AuditFile{},
-		&model.AddressBookCollection{},
-		&model.AddressBookCollectionRule{},
-		&model.ServerCmd{},
-		&model.DeviceGroup{},
 	)
 	if err != nil {
 		global.Logger.Error("migrate err :=>", err)
@@ -276,15 +257,6 @@ func Migrate(version uint) {
 		}
 		service.AllService.GroupService.Create(group)
 
-		shareGroup, _ := localizer.LocalizeMessage(&i18n.Message{
-			ID: "ShareGroup",
-		})
-		groupShare := &model.Group{
-			Name: shareGroup,
-			Type: model.GroupTypeShare,
-		}
-		service.AllService.GroupService.Create(groupShare)
-		//是true
 		is_admin := true
 		admin := &model.User{
 			Username: "admin",

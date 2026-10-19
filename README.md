@@ -95,6 +95,8 @@ docker compose up -d
 | `RUSTDESK_API_RUSTDESK_RELAY_SERVER` | RustDesk 中继服务器地址与端口 | `rustdesk.example.com:21117` |
 | `RUSTDESK_API_RUSTDESK_KEY` | 服务端公钥 Key 内容（与 KEY_FILE 二选一） | `rU5tD3sK...=` |
 | `RUSTDESK_API_RUSTDESK_KEY_FILE` | 公钥文件路径（支持 Docker 挂载自动读取，支持短别名 `KEY_FILE`） | `/app/data/id_ed25519.pub` |
+| `SOCKS5_PROXY` | SOCKS5 代理地址（解决国内服务器访问 GitHub OAuth 超时，支持 `ALL_PROXY`） | `socks5://192.168.1.100:1080` |
+| `HTTP_PROXY` | HTTP 代理地址（支持标准 `http_proxy`、`https_proxy`） | `http://192.168.1.100:7890` |
 | `RUSTDESK_API_RUSTDESK_API_SERVER` | API 服务器地址（可选，默认当前主机） | `https://api.example.com` |
 
 ---

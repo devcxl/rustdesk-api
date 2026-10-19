@@ -89,6 +89,8 @@ Navigate to `http://your-ip:21114/_admin` in your browser, click "Login with Git
 | `RUSTDESK_API_RUSTDESK_RELAY_SERVER` | RustDesk Relay Server host & port | `rustdesk.example.com:21117` |
 | `RUSTDESK_API_RUSTDESK_KEY` | Public Key content (Either this or KEY_FILE) | `rU5tD3sK...=` |
 | `RUSTDESK_API_RUSTDESK_KEY_FILE` | Public key file path (supports short alias `KEY_FILE` and auto-probe) | `/app/data/id_ed25519.pub` |
+| `SOCKS5_PROXY` | SOCKS5 proxy address for GitHub OAuth requests (supports `ALL_PROXY`) | `socks5://192.168.1.100:1080` |
+| `HTTP_PROXY` | HTTP proxy address (supports standard `http_proxy`, `https_proxy`) | `http://192.168.1.100:7890` |
 | `RUSTDESK_API_RUSTDESK_API_SERVER` | API Server Host (Default: current host) | `https://api.example.com` |
 
 ---

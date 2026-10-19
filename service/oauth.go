@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -136,28 +137,91 @@ func (svc *OauthService) GetOauthConfig(op string) (err error, oauthInfo *model.
 	return nil, oauthInfo, oauthConfig, provider
 }
 
-func getHTTPClientWithProxy() *http.Client {
-	timeout := time.Duration(60) * time.Second
-	if Config.Proxy.Enable {
-		if Config.Proxy.Host == "" {
-			if Logger != nil {
-				Logger.Warn("Proxy is enabled but proxy host is empty.")
-			}
-			return http.DefaultClient
-		}
-		proxyURL, err := url.Parse(Config.Proxy.Host)
-		if err != nil {
-			if Logger != nil {
-				Logger.Warn("Invalid proxy URL: ", err)
-			}
-			return http.DefaultClient
-		}
-		transport := &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-		}
-		return &http.Client{Transport: transport, Timeout: timeout}
+// GetConfiguredProxyURL 智能读取环境变量或配置中的代理地址，支持 SOCKS5 / HTTP / HTTPS
+func GetConfiguredProxyURL() (*url.URL, error) {
+	var raw string
+	if Config != nil && Config.Proxy.Host != "" {
+		raw = Config.Proxy.Host
 	}
-	return http.DefaultClient
+
+	// 环境变量优先检测（支持各类常见大小写拼写）
+	candidates := []string{
+		"SOCKS5_PROXY", "socks5_proxy",
+		"SOCKS_PROXY", "socks_proxy",
+		"ALL_PROXY", "all_proxy",
+		"HTTP_PROXY", "http_proxy",
+		"HTTPS_PROXY", "https_proxy",
+		"RUSTDESK_API_PROXY_HOST",
+		"PROXY_URL", "PROXY_HOST",
+	}
+	for _, envKey := range candidates {
+		if val := strings.TrimSpace(os.Getenv(envKey)); val != "" {
+			raw = val
+			break
+		}
+	}
+
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	// 格式归一化：若未包含 scheme 则默认作为 socks5:// 协议解析
+	if strings.HasPrefix(raw, "socks://") {
+		raw = "socks5://" + strings.TrimPrefix(raw, "socks://")
+	} else if !strings.Contains(raw, "://") {
+		raw = "socks5://" + raw
+	}
+
+	return url.Parse(raw)
+}
+
+func getHTTPClientWithProxy() *http.Client {
+	timeout := 60 * time.Second
+	proxyURL, err := GetConfiguredProxyURL()
+	if err != nil {
+		if Logger != nil {
+			Logger.Warn("Invalid proxy configuration: ", err)
+		}
+	}
+
+	var transport *http.Transport
+	if proxyURL != nil {
+		if Logger != nil {
+			Logger.Infof("Using proxy for GitHub OAuth requests: %s", proxyURL.Redacted())
+		}
+		transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	} else {
+		// 回退读取系统环境默认代理
+		transport = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+	}
 }
 
 func (svc *OauthService) callbackBase(oauthConfig *oauth2.Config, provider *oidc.Provider, code string, verifier string, nonce string, userData interface{}) (err error, client *http.Client) {

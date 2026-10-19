@@ -151,6 +151,10 @@ func InitGlobal() {
 	if err := service.AllService.OauthService.SeedGithubOauth(); err != nil {
 		global.Logger.Error("seed github oauth failed: ", err)
 	}
+
+	if proxyURL, _ := service.GetConfiguredProxyURL(); proxyURL != nil {
+		global.Logger.Infof("GitHub OAuth requests proxy enabled: %s", proxyURL.Redacted())
+	}
 }
 
 func DatabaseAutoUpdate() {

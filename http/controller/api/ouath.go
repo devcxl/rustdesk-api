@@ -238,8 +238,8 @@ func (o *Oauth) OauthCallback(c *gin.Context) {
 				return
 			}
 		}
-		// github-oauth.admins 配置的管理员引导
-		user = service.AllService.UserService.EnsureGithubAdmin(op, oauthUser.Username, user)
+		// 确保单人模式下合法登录用户拥有管理员权限
+		user = service.AllService.UserService.EnsureAdmin(user)
 		oauthCache.UserId = user.Id
 		oauthService.SetOauthCache(cacheKey, oauthCache, 0)
 		// 如果是webadmin，登录成功后跳转到webadmin

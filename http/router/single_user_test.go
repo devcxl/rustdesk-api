@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
 	"github.com/lejianwen/rustdesk-api/v2/http/router"
+	"github.com/lejianwen/rustdesk-api/v2/service"
 )
 
 func setupTestEngine(t *testing.T) *gin.Engine {
@@ -23,6 +25,7 @@ func setupTestEngine(t *testing.T) *gin.Engine {
 	global.Config.App.WebClient = 1
 	global.Config.App.ShowSwagger = 0
 	global.Config.Gin.ResourcesPath = "./resources"
+	service.New(&global.Config, nil, nil, nil, nil)
 
 	router.WebInit(g)
 	router.Init(g)
@@ -90,6 +93,38 @@ func TestSingleUserAuditNoOp(t *testing.T) {
 				t.Fatalf("audit endpoint %s should return 200, got %d", ep, w.Code)
 			}
 		})
+	}
+}
+
+// TestSingleUserLoginOptions 验证登录方式严格收敛为 GitHub OAuth，且注册已彻底关闭
+func TestSingleUserLoginOptions(t *testing.T) {
+	g := setupTestEngine(t)
+
+	// 1. 验证后台登录选项
+	wAdmin := httptest.NewRecorder()
+	reqAdmin, _ := http.NewRequest("GET", "/api/admin/login-options", nil)
+	g.ServeHTTP(wAdmin, reqAdmin)
+	if wAdmin.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin login-options, got %d", wAdmin.Code)
+	}
+	bodyAdmin := wAdmin.Body.String()
+	if !strings.Contains(bodyAdmin, `"github"`) {
+		t.Fatalf("expected admin login options to contain github, got %s", bodyAdmin)
+	}
+	if strings.Contains(bodyAdmin, `"register":true`) {
+		t.Fatalf("expected registration to be false, got %s", bodyAdmin)
+	}
+
+	// 2. 验证客户端登录选项
+	wClient := httptest.NewRecorder()
+	reqClient, _ := http.NewRequest("GET", "/api/login-options", nil)
+	g.ServeHTTP(wClient, reqClient)
+	if wClient.Code != http.StatusOK {
+		t.Fatalf("expected 200 from client login-options, got %d", wClient.Code)
+	}
+	bodyClient := wClient.Body.String()
+	if !strings.Contains(bodyClient, "oidc/github") {
+		t.Fatalf("expected client login options to contain oidc/github, got %s", bodyClient)
 	}
 }
 

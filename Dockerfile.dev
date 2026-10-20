@@ -64,8 +64,8 @@ COPY --from=builder-backend /app/release /app/
 COPY --from=builder-backend /app/conf /app/conf/
 COPY --from=builder-backend /app/resources /app/resources/
 COPY --from=builder-backend /app/docs /app/docs/
-# Copy frontend build from builder2 stage
-COPY --from=builder-admin-frontend /frontend/dist/ /app/resources/admin/
+# Copy the generated admin frontend from its build stage.
+COPY --from=builder-admin-frontend /app/resources/admin/ /app/resources/admin/
 
 # Ensure the binary is correctly built and linked
 RUN file /app/apimain && \

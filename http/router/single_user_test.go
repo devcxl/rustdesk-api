@@ -22,7 +22,6 @@ func setupTestEngine(t *testing.T) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	g := gin.New()
 
-	global.Config.App.WebClient = 1
 	global.Config.App.ShowSwagger = 0
 	global.Config.Gin.ResourcesPath = "./resources"
 	service.New(&global.Config, nil, nil, nil, nil)
@@ -41,6 +40,11 @@ func TestSingleUserRemovedEndpoints(t *testing.T) {
 		method string
 		path   string
 	}{
+		// WebClient 静态页面及专属服务端接口已移除
+		{"GET", "/webclient/index.html"},
+		{"GET", "/webclient-config/index.js"},
+		{"POST", "/api/server-config"},
+		{"POST", "/api/server-config-v2"},
 		// 注册通道彻底关闭
 		{"POST", "/api/admin/user/register"},
 		// 用户群组已移除
@@ -75,6 +79,27 @@ func TestSingleUserRemovedEndpoints(t *testing.T) {
 				t.Fatalf("endpoint %s %s should be removed (404), got code %d", ep.method, ep.path, w.Code)
 			}
 		})
+	}
+}
+
+func TestWebClientRoutesRemoved(t *testing.T) {
+	g := setupTestEngine(t)
+	removedRoutes := map[string]struct{}{
+		"GET /webclient/*filepath":       {},
+		"HEAD /webclient/*filepath":      {},
+		"GET /webclient2/*filepath":      {},
+		"HEAD /webclient2/*filepath":     {},
+		"GET /webclient-config/index.js": {},
+		"POST /api/server-config":        {},
+		"POST /api/server-config-v2":     {},
+		"GET /api/admin/config/app":      {},
+	}
+
+	for _, route := range g.Routes() {
+		name := route.Method + " " + route.Path
+		if _, exists := removedRoutes[name]; exists {
+			t.Errorf("WebClient route %s should not be registered", name)
+		}
 	}
 }
 

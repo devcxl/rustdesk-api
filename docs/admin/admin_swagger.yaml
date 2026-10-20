@@ -198,32 +198,11 @@ paths:
       summary: ADMIN服务配置
       tags:
       - ADMIN
-  /admin/config/app:
-    get:
-      consumes:
-      - application/json
-      description: APP服务配置
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.Response'
-      security:
-      - token: []
-      summary: APP服务配置
-      tags:
-      - ADMIN
   /admin/config/server:
     get:
       consumes:
       - application/json
-      description: 服务配置,给webclient提供api-server
+      description: RustDesk 服务端连接配置
       produces:
       - application/json
       responses:

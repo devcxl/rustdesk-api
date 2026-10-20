@@ -28,13 +28,6 @@ export interface LoginPayload {
   routeNames?: string[]
 }
 
-export interface LoginOptions {
-  op: string[]
-  register: boolean
-  auto_oidc: boolean
-  web_client: boolean
-}
-
 export interface ServerConfig {
   id_server: string
   key: string

@@ -1,4 +1,4 @@
-import { Loader2, Server, ShieldCheck } from 'lucide-react'
+import { Loader2, Server } from 'lucide-react'
 import * as React from 'react'
 
 import { GithubIcon } from '@/components/icons/GithubIcon'
@@ -17,23 +17,6 @@ export function LoginPage() {
   const [loading, setLoading] = React.useState(false)
   const [statusText, setStatusText] = React.useState('')
   const [errorText, setErrorText] = React.useState('')
-
-  // 检查是否已经在 URL query 或 hash 中带有登录成功回调
-  React.useEffect(() => {
-    // 自动发起登录检查
-    const initLogin = async () => {
-      try {
-        const opts = await api.login.getOptions()
-        if (opts.auto_oidc) {
-          // 自动启动 GitHub 登录流
-          handleGitHubLogin()
-        }
-      } catch (err: any) {
-        setErrorText(err.message || '获取登录选项失败')
-      }
-    }
-    initLogin()
-  }, [])
 
   const handleGitHubLogin = async () => {
     try {
@@ -94,18 +77,10 @@ export function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">RustDesk API</CardTitle>
           <CardDescription className="text-sm">
-            个人自建单用户控制面板（Self-Hosted Single User）
+            自托管管理控制面板
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border bg-muted/40 p-4 text-xs text-muted-foreground space-y-1.5">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <ShieldCheck className="h-4 w-4 text-emerald-500" />
-              <span>单用户安全模式</span>
-            </div>
-            <p>系统已锁定为仅允许环境变量指定的 GitHub 账号登录，首次登录自动成为唯一系统管理员。</p>
-          </div>
-
           {errorText && (
             <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
               {errorText}

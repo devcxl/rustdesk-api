@@ -2,7 +2,6 @@ import type {
   AddressBook,
   AdminConfig,
   ApiResponse,
-  LoginOptions,
   LoginPayload,
   PageData,
   Peer,
@@ -75,7 +74,6 @@ export async function request<T = any>(endpoint: string, options: RequestOptions
 // 业务 API
 export const api = {
   login: {
-    getOptions: () => request<LoginOptions>('/api/admin/login-options'),
     oidcAuth: (op = 'github') =>
       request<{ code: string; url: string }>('/api/admin/oidc/auth', {
         method: 'POST',

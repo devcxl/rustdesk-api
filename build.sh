@@ -4,6 +4,17 @@ set -e
 # Automatically get the current environment's GOARCH; if not defined, use the detected system architecture
 GOARCH=${GOARCH:-$(go env GOARCH)}
 DOCS="true"
+
+if ! command -v pnpm >/dev/null 2>&1; then
+    echo "pnpm 11 is required to build the admin frontend." >&2
+    exit 1
+fi
+
+case "$(pnpm --version)" in
+    11.*) ;;
+    *) echo "pnpm 11 is required to build the admin frontend." >&2; exit 1 ;;
+esac
+
 # Safely remove the old release directory
 rm -rf release
 
@@ -31,16 +42,9 @@ else
     echo "Skipping Swagger documentation generation due to DOCS is empty."
 fi
 
-# Build admin frontend if admin directory exists
-if [ -d "admin" ]; then
-    if command -v pnpm &> /dev/null; then
-        echo "Building admin frontend..."
-        (cd admin && pnpm install --frozen-lockfile && pnpm build)
-    elif command -v npm &> /dev/null; then
-        echo "Building admin frontend using npm..."
-        (cd admin && npm install && npm run build)
-    fi
-fi
+# Build the admin frontend from its lockfile before packaging resources.
+echo "Building admin frontend..."
+(cd admin && pnpm install --frozen-lockfile && pnpm build)
 
 # Compile the Go code and output it to the release directory
 go build -o release/apimain cmd/apimain.go

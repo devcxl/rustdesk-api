@@ -10,3 +10,4 @@ admin/node_modules
 admin/dist
 admin/.vite
 admin/.pnpm-debug.log*
+/resources/admin/

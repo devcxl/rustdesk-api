@@ -105,13 +105,13 @@ docker compose up -d
 
 ### 依赖环境
 - Go 1.23+
-- Node.js 22+ & pnpm 11+
+- Node.js 22+ & pnpm 11.x
 
 ### 编译运行
 ```bash
 # 1. 编译前端管理面板
 cd admin
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 cd ..
 
@@ -123,6 +123,7 @@ go run cmd/apimain.go
 ```bash
 ./build.sh
 ```
+Windows 可运行 `build.bat`。两个打包脚本都会先用 pnpm 11 构建管理后台；`resources/admin/` 是生成目录，不需要提交到 Git。
 
 ---
 

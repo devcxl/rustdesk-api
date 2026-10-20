@@ -99,13 +99,13 @@ Navigate to `http://your-ip:21114/_admin` in your browser, click "Login with Git
 
 ### Prerequisites
 - Go 1.23+
-- Node.js 22+ & pnpm 11+
+- Node.js 22+ & pnpm 11.x
 
 ### Build & Run
 ```bash
 # 1. Build frontend dashboard
 cd admin
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 cd ..
 
@@ -117,6 +117,7 @@ Or run the all-in-one build script:
 ```bash
 ./build.sh
 ```
+On Windows, run `build.bat`. Both packaging scripts build the admin frontend with pnpm 11 first; `resources/admin/` is generated output and should not be committed.
 
 ---
 

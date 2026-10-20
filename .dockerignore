@@ -27,3 +27,7 @@ release/
 bin/
 *.exe
 *.out
+
+# Generated frontend files are built in their own stage.
+resources/admin/
+admin/node_modules/

@@ -45,6 +45,8 @@ jobs:
         with:
           name: admin-dist
           path: resources/admin/
+          if-no-files-found: error
+          retention-days: 1
 
   # 原生构建产物：四平台打包并上传到 GitHub Release
   build:
@@ -62,6 +64,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Prepare admin output directory
+        run: rm -rf resources/admin && mkdir -p resources/admin
 
       - name: Download frontend dist
         uses: actions/download-artifact@v4

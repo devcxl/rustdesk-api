@@ -59,6 +59,14 @@ jobs:
       - name: Verify Go Build
         run: go build -o /dev/null ./cmd/apimain.go
 
+      - name: Upload admin frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          path: resources/admin/
+          if-no-files-found: error
+          retention-days: 1
+
   # 4 架构全量交叉编译仅在合并入 master 或手动触发时执行，加速 PR 反馈
   build:
     name: Cross-Build ${{ matrix.job.goos }}-${{ matrix.job.platform }}
@@ -76,6 +84,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Prepare admin output directory
+        run: rm -rf resources/admin && mkdir -p resources/admin
+
+      - name: Download admin frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-dist
+          path: resources/admin/
 
       - name: Set up Go environment
         uses: actions/setup-go@v5

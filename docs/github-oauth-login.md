@@ -8,7 +8,7 @@
 | 方式 | 入口 | 说明 |
 |------|------|------|
 | 账号密码 | ~~`POST /api/login`、`POST /api/admin/login`~~ | **已移除**（v2 后续版本），登录仅剩 OAuth/webauth |
-| OAuth（github/google/oidc/linuxdo） | `POST /api/oidc/auth` → `/api/oidc/callback` | provider 信息存 DB（Web 后台「Oauth 管理」维护 client_id/secret），github 类型已实现 |
+| OAuth（GitHub） | `POST /api/oidc/auth` → `/api/oidc/callback` | 当前单用户模式仅支持 GitHub OAuth2；凭据由 `github-oauth` 配置或环境变量提供 |
 | Web 授权（webauth） | 后台审批 | `web-sso: true` 时客户端可经后台授权登录 |
 
 ### 1.2 现有 OAuth 技术栈
@@ -51,7 +51,7 @@ github-oauth:
   users: ""                # 允许的个人 GitHub 登录名，逗号分隔
 ```
 
-- 结构体：`config.GithubOauth{RestrictEnable bool; Orgs string; Users string}`
+- 配置结构体：`config.GithubOauthAccess`（含 `RestrictEnable`、`Orgs`、`Users`、`Admins`、`ClientId`、`ClientSecret`）
 - 环境变量覆盖：`RUSTDESK_API_GITHUB_OAUTH_RESTRICT_ENABLE` 等（viper replacer 将键中 `.`/`-` 统一替换为 `_`）
 - 收敛登录方式：密码登录已直接移除；管理员通过 `github-oauth.admins` 配置引导
 

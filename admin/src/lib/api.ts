@@ -1,6 +1,5 @@
 import type {
   AddressBook,
-  AdminConfig,
   ApiResponse,
   LoginPayload,
   PageData,
@@ -93,12 +92,10 @@ export const api = {
   },
   config: {
     getServer: () => request<ServerConfig>('/api/admin/config/server'),
-    getAdmin: () => request<AdminConfig>('/api/admin/config/admin'),
   },
   peers: {
     getList: (params?: { page?: number; page_size?: number; id?: string; hostname?: string }) =>
       request<PageData<Peer>>('/api/admin/peer/list', { params }),
-    getDetail: (id: number | string) => request<Peer>(`/api/admin/peer/detail/${id}`),
     update: (data: { id: number | string; alias?: string }) =>
       request('/api/admin/peer/update', {
         method: 'POST',

@@ -35,12 +35,6 @@ export interface ServerConfig {
   api_server: string
 }
 
-export interface AdminConfig {
-  title?: string
-  welcome?: string
-  login_url?: string
-}
-
 export interface Peer {
   row_id: number
   id: string

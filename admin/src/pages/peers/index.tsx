@@ -45,6 +45,8 @@ import {
 import { api } from '@/lib/api'
 import type { Peer } from '@/types/api'
 
+type DeleteTarget = { kind: 'single'; rowId: number } | { kind: 'batch' }
+
 export function PeersPage() {
   const [loading, setLoading] = React.useState(false)
   const [peers, setPeers] = React.useState<Peer[]>([])
@@ -63,8 +65,7 @@ export function PeersPage() {
   const [detailPeer, setDetailPeer] = React.useState<Peer | null>(null)
 
   // 删除确认
-  const [deleteId, setDeleteId] = React.useState<number | null>(null)
-  const [isBatchDelete, setIsBatchDelete] = React.useState(false)
+  const [deleteTarget, setDeleteTarget] = React.useState<DeleteTarget | null>(null)
 
   React.useEffect(() => {
     loadPeers()
@@ -129,21 +130,20 @@ export function PeersPage() {
 
   const handleConfirmDelete = async () => {
     try {
-      if (isBatchDelete) {
+      if (deleteTarget?.kind === 'batch') {
         if (selectedIds.length === 0) return
         await api.peers.batchDelete(selectedIds)
         toast.success(`已批量删除 ${selectedIds.length} 台设备`)
         setSelectedIds([])
-      } else if (deleteId !== null) {
-        await api.peers.delete(deleteId)
+      } else if (deleteTarget?.kind === 'single') {
+        await api.peers.delete(deleteTarget.rowId)
         toast.success('设备已删除')
       }
       loadPeers()
     } catch (err: any) {
       toast.error(err.message || '删除失败')
     } finally {
-      setDeleteId(null)
-      setIsBatchDelete(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -202,10 +202,7 @@ export function PeersPage() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => {
-                setIsBatchDelete(true)
-                setDeleteId(1) // 触发确认弹窗
-              }}
+              onClick={() => setDeleteTarget({ kind: 'batch' })}
               className="gap-1.5"
             >
               <Trash2 className="h-4 w-4" />
@@ -342,10 +339,9 @@ export function PeersPage() {
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             title="删除设备"
-                            onClick={() => {
-                              setIsBatchDelete(false)
-                              setDeleteId(peer.row_id)
-                            }}
+                            onClick={() =>
+                              setDeleteTarget({ kind: 'single', rowId: peer.row_id })
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -475,14 +471,14 @@ export function PeersPage() {
 
       {/* 删除确认弹窗 */}
       <AlertDialog
-        open={deleteId !== null}
-        onOpenChange={(open) => !open && setDeleteId(null)}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除？</AlertDialogTitle>
             <AlertDialogDescription>
-              {isBatchDelete
+              {deleteTarget?.kind === 'batch'
                 ? `确定要批量删除已选中的 ${selectedIds.length} 台设备记录吗？删除后相关设备下次上报心跳时将重新自动注册。`
                 : '确定要删除此设备记录吗？删除后该设备下次上报心跳时将重新自动注册。'}
             </AlertDialogDescription>

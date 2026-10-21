@@ -31,9 +31,9 @@ Go 1.23, single module `github.com/lejianwen/rustdesk-api/v2`. Layering, top to 
 
 ```
 cmd/apimain.go        entrypoint, bootstraps config and DB seeding
-  config/             typed config loading (app, gin, gorm, jwt, oauth, ldap, redis, oss, rustdesk, proxy)
+  config/             typed config loading (app, gin, gorm, jwt, oauth, ldap, oss, rustdesk, proxy)
   global/             process-wide singletons (Config), i18n, validators
-  lib/                reusable infrastructure: cache, jwt, lock, logger, orm, upload
+  lib/                reusable infrastructure: jwt, lock, logger, orm, upload
   model/              GORM persistence models, one file per aggregate
   service/            business logic; AllService holds the service instances
   http/

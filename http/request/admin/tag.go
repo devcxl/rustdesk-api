@@ -10,15 +10,6 @@ type TagForm struct {
 	CollectionId uint   `json:"collection_id"`
 }
 
-func (f *TagForm) FromTag(group *model.Tag) *TagForm {
-	f.Id = group.Id
-	f.Name = group.Name
-	f.Color = group.Color
-	f.UserId = group.UserId
-	f.CollectionId = group.CollectionId
-	return f
-}
-
 func (f *TagForm) ToTag() *model.Tag {
 	i := &model.Tag{}
 	i.Id = f.Id

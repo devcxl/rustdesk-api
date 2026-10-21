@@ -46,20 +46,6 @@ type PeerPayloadInfo struct {
 	Username   string `json:"username"`
 }
 
-func (gpp *GroupPeerPayload) FromAddressBook(a *model.AddressBook, username string) {
-	gpp.Id = a.Id
-	os := a.Platform
-	if a.Platform == "Mac OS" {
-		os = "MacOS"
-	}
-	gpp.Info = &PeerPayloadInfo{
-		DeviceName: a.Hostname,
-		Os:         os,
-		Username:   a.Username,
-	}
-	gpp.UserName = username
-}
-
 func (gpp *GroupPeerPayload) FromPeer(p *model.Peer, username string, dGroupName string) {
 	gpp.Id = p.Id
 	gpp.Info = &PeerPayloadInfo{

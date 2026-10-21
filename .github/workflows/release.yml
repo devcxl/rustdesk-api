@@ -89,36 +89,11 @@ jobs:
         run: echo $VERSION > resources/version
 
       - name: Build for ${{ matrix.job.goos }}-${{ matrix.job.platform }}
-        run: |
-          mkdir release -p
-          cp -ar resources release/
-          cp -ar docs release/
-          cp -ar conf release/
-          mkdir -p release/data
-          mkdir -p release/runtime
-          if [ "${{ matrix.job.goos }}" = "windows" ]; then
-            sudo apt-get install gcc-mingw-w64-x86-64 zip -y
-            GOOS=${{ matrix.job.goos }} GOARCH=${{ matrix.job.platform }} CC=x86_64-w64-mingw32-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain.exe ./cmd/apimain.go
-            echo @echo off > release/start.bat
-            echo cmd /c \"%~dp0apimain.exe\" >> release/start.bat
-            zip -r ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}} ./release
-          else
-            if [ "${{ matrix.job.platform }}" = "arm64" ]; then
-                wget https://musl.ljw.red/aarch64-linux-musl-cross.tgz
-                tar -xf aarch64-linux-musl-cross.tgz
-                export PATH=$PATH:$PWD/aarch64-linux-musl-cross/bin
-                GOOS=${{ matrix.job.goos }} GOARCH=${{ matrix.job.platform }} CC=aarch64-linux-musl-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain ./cmd/apimain.go
-            elif [ "${{ matrix.job.platform }}" = "armv7l" ]; then
-                wget https://musl.ljw.red/armv7l-linux-musleabihf-cross.tgz
-                tar -xf armv7l-linux-musleabihf-cross.tgz
-                export PATH=$PATH:$PWD/armv7l-linux-musleabihf-cross/bin
-                GOOS=${{ matrix.job.goos }} GOARCH=arm GOARM=7 CC=armv7l-linux-musleabihf-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain ./cmd/apimain.go
-            else
-              sudo apt-get install musl musl-dev musl-tools -y
-              GOOS=${{ matrix.job.goos }} GOARCH=${{ matrix.job.platform }} CC=musl-gcc CGO_LDFLAGS="-static" CGO_ENABLED=1 go build -ldflags "-s -w" -o ./release/apimain ./cmd/apimain.go
-            fi
-            tar -czf ${{ matrix.job.goos}}-${{ matrix.job.platform }}.${{matrix.job.file_ext}} ./release
-          fi
+        env:
+          TARGET_GOOS: ${{ matrix.job.goos }}
+          TARGET_PLATFORM: ${{ matrix.job.platform }}
+          ARCHIVE_EXTENSION: ${{ matrix.job.file_ext }}
+        run: bash .github/scripts/build-apimain.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -88,7 +88,7 @@ docker compose up -d
 
 | 环境变量名 | 说明 | 示例 |
 | :--- | :--- | :--- |
-| `ALLOWED_USERS` | 允许登录的 GitHub 用户名白名单（推荐） | `my-github-account` |
+| `ALLOWED_USERS` | 允许登录的 GitHub 用户名白名单；未配置有效白名单时拒绝登录 | `my-github-account` |
 | `RUSTDESK_API_GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth 应用 Client ID | `Ov23li...` |
 | `RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth 应用 Client Secret | `6789abcd...` |
 | `RUSTDESK_API_RUSTDESK_ID_SERVER` | RustDesk ID 服务器地址与端口 | `rustdesk.example.com:21116` |

@@ -35,18 +35,18 @@ GitHub OAuth2 基础能力已具备，缺的只是：**配置化的访问控制�
 在该处拿到 `GithubUser.Login` 与带 token 的 `http.Client`，校验失败直接返回错误，使 **登录 / 自动注册(auto_register) / 绑定(bind)** 三条路径同时被拦截，避免在各 controller 分散校验造成遗漏。
 
 判定顺序：
-1. 未启用限制（默认）→ 行为与现状一致
-2. `login` 命中 `users` 白名单（大小写不敏感）→ 通过
-3. 遍历 `orgs`，任一 org 校验通过 → 通过
-4. 否则拒绝，回调页面展示 `GithubAccessDenied`
+1. 配置了 `users` 或环境变量用户名白名单时，仅命中用户或 `admins` 的账号可通过。
+2. 未配置用户白名单时，命中 `admins` 的账号可通过。
+3. 未命中上述名单时，仅当 `restrict-enable` 为 `true` 才检查 `orgs`；任一组织的活跃成员可通过。
+4. 否则拒绝，回调页面展示 `GithubAccessDenied`。未配置有效白名单时所有账号均被拒绝。
 
 ## 4. 配置层设计
 
-`conf/config.yaml` 新增段（默认关闭，零影响升级）：
+`conf/config.yaml` 配置段：
 
 ```yaml
 github-oauth:
-  restrict-enable: false   # 是否启用 GitHub 登录白名单限制
+  restrict-enable: false   # 是否启用组织成员校验
   orgs: ""                 # 允许的组织，逗号分隔，如 "acme-org,subsidiary"
   users: ""                # 允许的个人 GitHub 登录名，逗号分隔
 ```
@@ -65,5 +65,5 @@ github-oauth:
 
 ## 6. 风险与备注
 - GitHub API 不可用时：校验请求失败按**拒绝**处理（fail-closed），保证不放大权限
-- 白名单大小写不敏感；`users` 与 `orgs` 同时配置时取并集
-- 已存在的本地绑定用户不受影响——限制发生在 OAuth 握手阶段，未通过即无法换取 token 完成任何动作
+- 用户名白名单大小写不敏感；配置了 `users` 时不会检查 `orgs`。
+- 升级前请配置用户或管理员白名单，或启用组织限制并配置组织，否则新的 OAuth 登录将被拒绝。已有令牌不会因此自动撤销；本地绑定用户重新登录时仍会被检查。

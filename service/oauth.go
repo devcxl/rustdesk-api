@@ -364,9 +364,9 @@ func (svc *OauthService) checkGithubAccess(client *http.Client, login string) er
 		return nil
 	}
 
-	// 3. 检查是否启用了限制
+	// 3. 未启用组织限制时，未命中用户或管理员白名单的请求一律拒绝。
 	if !cfg.RestrictEnable {
-		return nil
+		return errors.New("GithubAccessDenied")
 	}
 
 	// 4. 检查组织白名单

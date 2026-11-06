@@ -33,15 +33,24 @@ func setupGithubMembershipMock(t *testing.T, memberships map[string]string) stri
 	return srv.URL
 }
 
-func TestCheckGithubAccessDisabledWhenNoUsersConfigured(t *testing.T) {
+func TestCheckGithubAccessDeniedWithoutEnabledAllowlist(t *testing.T) {
+	for _, key := range []string{"ALLOWED_USERS", "GITHUB_ALLOWED_USERS", "RUSTDESK_ALLOWED_USERS", "RUSTDESK_API_GITHUB_OAUTH_USERS"} {
+		t.Setenv(key, "")
+	}
+	previousConfig := Config
+	t.Cleanup(func() { Config = previousConfig })
 	Config = &config.Config{GithubOauth: config.GithubOauthAccess{
 		RestrictEnable: false,
-		Orgs:           "",
+		Orgs:           "acme",
 		Users:          "",
 	}}
 	os := &OauthService{}
-	if err := os.checkGithubAccess(http.DefaultClient, "anyone"); err != nil {
-		t.Fatalf("no restriction should allow anyone, got %v", err)
+	if err := os.checkGithubAccess(http.DefaultClient, "anyone"); err == nil {
+		t.Fatal("disabled organization restriction must not allow arbitrary users")
+	}
+	Config.GithubOauth.Orgs = ""
+	if err := os.checkGithubAccess(http.DefaultClient, "anyone"); err == nil {
+		t.Fatal("missing allowlist must deny arbitrary users")
 	}
 }
 

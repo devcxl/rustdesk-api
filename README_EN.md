@@ -82,7 +82,7 @@ Navigate to `http://your-ip:21114/_admin` in your browser, click "Login with Git
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
-| `ALLOWED_USERS` | Allowed GitHub username whitelist (Recommended) | `my-github-account` |
+| `ALLOWED_USERS` | Allowed GitHub usernames; login is denied without an effective allowlist | `my-github-account` |
 | `RUSTDESK_API_GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth App Client ID | `Ov23li...` |
 | `RUSTDESK_API_GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth App Client Secret | `6789abcd...` |
 | `RUSTDESK_API_RUSTDESK_ID_SERVER` | RustDesk ID Server host & port | `rustdesk.example.com:21116` |

@@ -12,60 +12,104 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { api, setToken } from '@/lib/api'
+import {
+  canAutoRedirect,
+  clearAutoLoginSuppression,
+  clearAutoRedirectState,
+  markAutoRedirect,
+} from '@/lib/authStorage'
+
+const CALLBACK_PREFIX = '#/oauth/callback'
+const CALLBACK_ATTEMPTS = 5
+const CALLBACK_RETRY_MS = 400
+
+function readCallbackState(): string {
+  const hash = window.location.hash || ''
+  if (!hash.startsWith(CALLBACK_PREFIX)) {
+    return ''
+  }
+  const queryIndex = hash.indexOf('?')
+  if (queryIndex < 0) {
+    return ''
+  }
+  return new URLSearchParams(hash.slice(queryIndex + 1)).get('state') || ''
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export function LoginPage() {
   const [loading, setLoading] = React.useState(false)
   const [statusText, setStatusText] = React.useState('')
   const [errorText, setErrorText] = React.useState('')
+  const startedRef = React.useRef(false)
 
-  const handleGitHubLogin = async () => {
+  const startLogin = React.useCallback(async () => {
     try {
       setLoading(true)
       setErrorText('')
-      setStatusText('正在请求 GitHub 授权链接...')
-      const { code, url } = await api.login.oidcAuth('github')
-
-      setStatusText('正在等待 GitHub 授权确认...')
-
-      // 打开新窗口进行 OAuth 授权，或者在当前页直接跳转
-      const authWindow = window.open(
-        url,
-        'oauth_window',
-        'width=600,height=700,status=no,resizable=yes'
-      )
-
-      // 轮询查询授权结果
-      const interval = setInterval(async () => {
-        try {
-          const res = await api.login.oidcAuthQuery(code)
-          if (res && res.token) {
-            clearInterval(interval)
-            setToken(res.token)
-            setStatusText('授权成功，正在进入系统...')
-            if (authWindow && !authWindow.closed) {
-              authWindow.close()
-            }
-            window.location.hash = '#/'
-          }
-        } catch {
-          // 继续轮询
-        }
-      }, 1500)
-
-      // 3 分钟超时保护
-      setTimeout(() => {
-        clearInterval(interval)
-        if (loading) {
-          setLoading(false)
-          setStatusText('')
-          setErrorText('授权超时，请重试')
-        }
-      }, 180000)
+      setStatusText('正在跳转 GitHub 授权页面...')
+      const { url } = await api.login.oidcAuth('github')
+      markAutoRedirect()
+      // 整页跳转不依赖弹窗权限；服务端回调会带 state 返回 SPA。
+      window.location.assign(url)
     } catch (err: any) {
       setLoading(false)
       setStatusText('')
       setErrorText(err.message || '发起 GitHub 授权失败')
     }
+  }, [])
+
+  const finishLogin = React.useCallback(async (state: string) => {
+    setLoading(true)
+    setErrorText('')
+    setStatusText('正在确认 GitHub 授权...')
+    for (let attempt = 0; attempt < CALLBACK_ATTEMPTS; attempt++) {
+      try {
+        const res = await api.login.oidcAuthQuery(state)
+        if (res && res.token) {
+          setToken(res.token)
+          clearAutoRedirectState()
+          setStatusText('授权成功，正在进入系统...')
+          window.location.hash = '#/'
+          return
+        }
+      } catch {
+        // 回调刚写入缓存时可能还没就绪，短暂重试。
+      }
+      if (attempt < CALLBACK_ATTEMPTS - 1) {
+        await sleep(CALLBACK_RETRY_MS)
+      }
+    }
+    // 失败后不要立即再次自动跳转，保留手动按钮。
+    markAutoRedirect()
+    window.location.hash = '#/login'
+    setLoading(false)
+    setStatusText('')
+    setErrorText('登录确认失败，请重新点击 GitHub 登录')
+  }, [])
+
+  React.useEffect(() => {
+    if (startedRef.current) {
+      return
+    }
+    startedRef.current = true
+
+    const callbackState = readCallbackState()
+    if (callbackState) {
+      void finishLogin(callbackState)
+      return
+    }
+    if (canAutoRedirect()) {
+      markAutoRedirect()
+      void startLogin()
+    }
+  }, [finishLogin, startLogin])
+
+  const handleManualLogin = () => {
+    clearAutoLoginSuppression()
+    void startLogin()
   }
 
   return (
@@ -96,7 +140,7 @@ export function LoginPage() {
 
           <Button
             className="w-full h-11 text-base font-medium shadow"
-            onClick={handleGitHubLogin}
+            onClick={handleManualLogin}
             disabled={loading}
           >
             {loading ? (

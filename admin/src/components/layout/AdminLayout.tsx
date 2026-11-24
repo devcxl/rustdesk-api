@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { api, removeToken } from '@/lib/api'
+import { suppressAutoLogin } from '@/lib/authStorage'
 import { useTheme } from '@/lib/theme'
 import type { User } from '@/types/api'
 
@@ -50,6 +51,8 @@ export function AdminLayout({ currentPath, children }: AdminLayoutProps) {
   ]
 
   const handleLogout = async () => {
+    // 显式登出后不得自动再次跳转 GitHub 授权。
+    suppressAutoLogin()
     try {
       await api.login.logout()
     } catch {

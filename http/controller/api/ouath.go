@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
@@ -31,6 +32,11 @@ func (o *Oauth) OidcAuth(c *gin.Context) {
 	err := c.ShouldBindJSON(&f)
 	if err != nil {
 		response.Error(c, response.TranslateMsg(c, "ParamsError")+err.Error())
+		return
+	}
+
+	if err := service.ValidateOidcAuthParams(f.Id, f.Uuid, f.Op, f.DeviceInfo.Name, f.DeviceInfo.Os, f.DeviceInfo.Type); err != nil {
+		response.Error(c, response.TranslateMsg(c, "ParamsError"))
 		return
 	}
 
@@ -133,6 +139,13 @@ func (o *Oauth) OidcAuthQuery(c *gin.Context) {
 	})
 }
 
+// webadminCallbackRedirect returns the SPA route that finishes a web login.
+// The one-time state lives in the URL fragment, so it is not sent to the server
+// in Referer/logs and is consumed by the follow-up auth-query poll.
+func webadminCallbackRedirect(state string) string {
+	return "/_admin/#/oauth/callback?state=" + url.QueryEscape(state)
+}
+
 // OauthCallback 回调
 // @Tags Oauth
 // @Summary OauthCallback
@@ -161,15 +174,34 @@ func (o *Oauth) OauthCallback(c *gin.Context) {
 		})
 		return
 	}
+	code := c.Query("code")
+	if code == "" {
+		oauthService.DeleteOauthCache(cacheKey)
+		c.HTML(http.StatusOK, "oauth_fail.html", gin.H{
+			"message":     "ParamIsEmpty",
+			"sub_message": "code",
+		})
+		return
+	}
+	// A completed login state must not be exchangeable again.
+	if oauthCache.Action == service.OauthActionTypeLogin && oauthCache.UserId != 0 {
+		oauthService.DeleteOauthCache(cacheKey)
+		c.HTML(http.StatusOK, "oauth_fail.html", gin.H{
+			"message": "OauthHasBeenSuccess",
+		})
+		return
+	}
+
 	nonce := oauthCache.Nonce
 	op := oauthCache.Op
 	action := oauthCache.Action
 	verifier := oauthCache.Verifier
 	var user *model.User
 	// 获取用户信息
-	code := c.Query("code")
-	err, oauthUser := oauthService.Callback(code, verifier, op, nonce)
+	err, oauthUser := oauthService.Callback(c.Request.Context(), code, verifier, op, nonce)
 	if err != nil {
+		// Failed exchanges are single-use; drop the state so it cannot be replayed.
+		oauthService.DeleteOauthCache(cacheKey)
 		c.HTML(http.StatusOK, "oauth_fail.html", gin.H{
 			"message":     "OauthFailed",
 			"sub_message": err.Error(),
@@ -251,7 +283,7 @@ func (o *Oauth) OauthCallback(c *gin.Context) {
 				Type:     model.LoginLogTypeOauth,
 				Platform: oauthService.DeviceOs,
 			})*/
-			c.Redirect(http.StatusFound, "/_admin/#/")
+			c.Redirect(http.StatusFound, webadminCallbackRedirect(cacheKey))
 			return
 		}
 		c.HTML(http.StatusOK, "oauth_success.html", gin.H{

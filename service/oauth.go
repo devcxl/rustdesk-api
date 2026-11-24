@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -50,7 +51,15 @@ func (oci *OauthCacheItem) ToOauthUser() *model.OauthUser {
 	}
 }
 
-var OauthCache = &sync.Map{}
+// OauthCache stores pending OAuth states keyed by the state nonce.
+// The size is capped to bound memory under state-flooding attempts.
+var (
+	OauthCache = &sync.Map{}
+
+	// oauthCacheMu makes the cap check and the store atomic w.r.t. each other.
+	oauthCacheMu    sync.Mutex
+	oauthCacheCount int64
+)
 
 // githubMembershipURLFmt GitHub 组织成员资格查询接口，测试时可替换为 httptest 地址
 var githubMembershipURLFmt = "https://api.github.com/user/memberships/orgs/%s"
@@ -58,7 +67,26 @@ var githubMembershipURLFmt = "https://api.github.com/user/memberships/orgs/%s"
 const (
 	OauthActionTypeLogin = "login"
 	OauthActionTypeBind  = "bind"
+
+	maxOauthCacheEntries = 1000
+	// maxOauthFieldLen bounds opaque client identifiers copied into the cache.
+	maxOauthFieldLen = 512
+	maxOauthOpLen    = 32
 )
+
+// ValidateOidcAuthParams rejects OAuth init requests carrying oversized fields.
+// Values that are too long are never stored in the OAuth cache.
+func ValidateOidcAuthParams(id, uuid, op, deviceName, deviceOs, deviceType string) error {
+	if len(op) > maxOauthOpLen {
+		return errors.New("ParamsError")
+	}
+	for _, field := range []string{id, uuid, deviceName, deviceOs, deviceType} {
+		if len(field) > maxOauthFieldLen {
+			return errors.New("ParamsError")
+		}
+	}
+	return nil
+}
 
 func (oci *OauthCacheItem) UpdateFromOauthUser(oauthUser *model.OauthUser) {
 	oci.OpenId = oauthUser.OpenId
@@ -76,7 +104,18 @@ func (svc *OauthService) GetOauthCache(key string) *OauthCacheItem {
 }
 
 func (svc *OauthService) SetOauthCache(key string, item *OauthCacheItem, expire uint) {
+	oauthCacheMu.Lock()
+	if _, exists := OauthCache.Load(key); !exists {
+		if atomic.LoadInt64(&oauthCacheCount) >= maxOauthCacheEntries {
+			// Drop new keys once the cache is full; existing keys can still refresh.
+			oauthCacheMu.Unlock()
+			return
+		}
+		atomic.AddInt64(&oauthCacheCount, 1)
+	}
 	OauthCache.Store(key, item)
+	oauthCacheMu.Unlock()
+
 	if expire > 0 {
 		time.AfterFunc(time.Duration(expire)*time.Second, func() {
 			svc.DeleteOauthCache(key)
@@ -85,7 +124,11 @@ func (svc *OauthService) SetOauthCache(key string, item *OauthCacheItem, expire 
 }
 
 func (svc *OauthService) DeleteOauthCache(key string) {
-	OauthCache.Delete(key)
+	oauthCacheMu.Lock()
+	defer oauthCacheMu.Unlock()
+	if _, loaded := OauthCache.LoadAndDelete(key); loaded {
+		atomic.AddInt64(&oauthCacheCount, -1)
+	}
 }
 
 // BeginAuth: Initiate OAuth authentication
@@ -140,7 +183,9 @@ func (svc *OauthService) GetOauthConfig(op string) (err error, oauthInfo *model.
 // GetConfiguredProxyURL 智能读取环境变量或配置中的代理地址，支持 SOCKS5 / HTTP / HTTPS
 func GetConfiguredProxyURL() (*url.URL, error) {
 	var raw string
-	if Config != nil && Config.Proxy.Host != "" {
+	// Only honor the config proxy when it is explicitly enabled; otherwise the
+	// shipped default host would silently route OAuth traffic to a local proxy.
+	if Config != nil && Config.Proxy.Enable && Config.Proxy.Host != "" {
 		raw = Config.Proxy.Host
 	}
 
@@ -173,7 +218,13 @@ func GetConfiguredProxyURL() (*url.URL, error) {
 		raw = "socks5://" + raw
 	}
 
-	return url.Parse(raw)
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		// url.Parse embeds the whole input (including userinfo) in its error.
+		// Never propagate or log the raw value.
+		return nil, errors.New("invalid proxy url")
+	}
+	return parsed, nil
 }
 
 func getHTTPClientWithProxy() *http.Client {
@@ -181,7 +232,7 @@ func getHTTPClientWithProxy() *http.Client {
 	proxyURL, err := GetConfiguredProxyURL()
 	if err != nil {
 		if Logger != nil {
-			Logger.Warn("Invalid proxy configuration: ", err)
+			Logger.Warn("Invalid proxy configuration (value redacted)")
 		}
 	}
 
@@ -224,9 +275,10 @@ func getHTTPClientWithProxy() *http.Client {
 	}
 }
 
-func (svc *OauthService) callbackBase(oauthConfig *oauth2.Config, provider *oidc.Provider, code string, verifier string, nonce string, userData interface{}) (err error, client *http.Client) {
+func (svc *OauthService) callbackBase(ctx context.Context, oauthConfig *oauth2.Config, provider *oidc.Provider, code string, verifier string, nonce string, userData interface{}) (err error, client *http.Client) {
 	httpClient := getHTTPClientWithProxy()
-	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient)
+	defer httpClient.CloseIdleConnections()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 
 	exchangeOpts := make([]oauth2.AuthCodeOption, 0, 1)
 	if verifier != "" {
@@ -266,9 +318,9 @@ func (svc *OauthService) callbackBase(oauthConfig *oauth2.Config, provider *oidc
 }
 
 // githubCallback github 回调处理
-func (svc *OauthService) githubCallback(oauthConfig *oauth2.Config, provider *oidc.Provider, code, verifier, nonce string) (error, *model.OauthUser) {
+func (svc *OauthService) githubCallback(ctx context.Context, oauthConfig *oauth2.Config, provider *oidc.Provider, code, verifier, nonce string) (error, *model.OauthUser) {
 	var user = &model.GithubUser{}
-	err, client := svc.callbackBase(oauthConfig, provider, code, verifier, nonce, user)
+	err, client := svc.callbackBase(ctx, oauthConfig, provider, code, verifier, nonce, user)
 	if err != nil {
 		return err, nil
 	}
@@ -395,12 +447,12 @@ func (svc *OauthService) checkGithubAccess(client *http.Client, login string) er
 }
 
 // Callback: 通过授权码与 verifier 获取用户信息
-func (svc *OauthService) Callback(code, verifier, op, nonce string) (err error, oauthUser *model.OauthUser) {
+func (svc *OauthService) Callback(ctx context.Context, code, verifier, op, nonce string) (err error, oauthUser *model.OauthUser) {
 	err, _, oauthConfig, provider := svc.GetOauthConfig(op)
 	if err != nil {
 		return err, nil
 	}
-	return svc.githubCallback(oauthConfig, provider, code, verifier, nonce)
+	return svc.githubCallback(ctx, oauthConfig, provider, code, verifier, nonce)
 }
 
 func (svc *OauthService) UserThirdInfo(op string, openId string) *model.UserThird {

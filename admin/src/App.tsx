@@ -22,21 +22,22 @@ export default function App() {
   }, [])
 
   const token = getToken()
+  const isLoginRoute = currentHash === '#/login' || currentHash.startsWith('#/oauth/callback')
 
-  // 路由拦截：未登录且不在登录页
-  if (!token && currentHash !== '#/login') {
+  // 路由拦截：未登录且不在登录/回调页
+  if (!token && !isLoginRoute) {
     window.location.hash = '#/login'
     return <LoginPage />
   }
 
-  // 已登录但仍在登录页
-  if (token && currentHash === '#/login') {
+  // 已登录但仍在登录/回调页
+  if (token && isLoginRoute) {
     window.location.hash = '#/'
     return null
   }
 
   // 登录页直接渲染
-  if (currentHash === '#/login') {
+  if (isLoginRoute) {
     return (
       <>
         <LoginPage />

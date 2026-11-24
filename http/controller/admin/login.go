@@ -70,6 +70,11 @@ func (ct *Login) OidcAuth(c *gin.Context) {
 		return
 	}
 
+	if err := service.ValidateOidcAuthParams(f.Id, f.Uuid, f.Op, f.DeviceInfo.Name, f.DeviceInfo.Os, f.DeviceInfo.Type); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
+
 	err, state, verifier, nonce, url := service.AllService.OauthService.BeginAuth(f.Op)
 	if err != nil {
 		response.Error(c, response.TranslateMsg(c, err.Error()))

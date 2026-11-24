@@ -7,7 +7,7 @@ ARG BUILDARCH=amd64
 # builder image drift to a different digest. Refresh via Dependabot's docker
 # ecosystem, or re-resolve explicitly with `docker buildx imagetools inspect`.
 # FROM golang:1.22-alpine AS builder
-FROM crazymax/xgo:1.22@sha256:f5e6b93e93b58574ac7ee5ea01234a7fca999cbd7d34ae049cda5fe0ec0264bc AS builder-backend
+FROM crazymax/xgo:1.25@sha256:7c7f13514c5212ddb34e5771908b873dfef3361c1bad089de00c1af46c77af25 AS builder-backend
 
 # Set up working directory
 WORKDIR /app

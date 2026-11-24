@@ -115,7 +115,7 @@ export function PeersPage() {
     try {
       setSubmittingEdit(true)
       await api.peers.update({
-        id: editPeer.id,
+        row_id: editPeer.row_id,
         alias: editAlias,
       })
       toast.success('设备别名已更新')

@@ -96,20 +96,20 @@ export const api = {
   peers: {
     getList: (params?: { page?: number; page_size?: number; id?: string; hostname?: string }) =>
       request<PageData<Peer>>('/api/admin/peer/list', { params }),
-    update: (data: { id: number | string; alias?: string }) =>
+    update: (data: { row_id: number; alias?: string }) =>
       request('/api/admin/peer/update', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    delete: (id: number | string) =>
+    delete: (rowId: number) =>
       request('/api/admin/peer/delete', {
         method: 'POST',
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ row_id: rowId }),
       }),
-    batchDelete: (ids: (number | string)[]) =>
+    batchDelete: (rowIds: number[]) =>
       request('/api/admin/peer/batchDelete', {
         method: 'POST',
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ row_ids: rowIds }),
       }),
   },
   tags: {
@@ -139,20 +139,20 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (data: Partial<AddressBook>) =>
+    update: (data: Partial<AddressBook> & { row_id: number }) =>
       request('/api/admin/address_book/update', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    delete: (id: number) =>
+    delete: (rowId: number) =>
       request('/api/admin/address_book/delete', {
         method: 'POST',
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ row_id: rowId }),
       }),
-    batchCreateFromPeers: (ids: (number | string)[]) =>
+    batchCreateFromPeers: (rowIds: number[]) =>
       request('/api/admin/address_book/batchCreateFromPeers', {
         method: 'POST',
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ peer_ids: rowIds }),
       }),
   },
 }

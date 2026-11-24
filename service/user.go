@@ -15,6 +15,9 @@ import (
 
 const DefaultOwnerUserId = 1
 
+// defaultTokenMaxLifetime 会话绝对寿命默认值(30天)
+const defaultTokenMaxLifetime = 30 * 24 * time.Hour
+
 type UserService struct {
 }
 
@@ -72,6 +75,11 @@ func (us *UserService) InfoByAccessToken(token string) (*model.User, *model.User
 	DB.Where("token = ?", token).First(ut)
 	if ut.Id == 0 {
 		return u, ut
+	}
+	// 绝对寿命上限: 无论滑动续期如何, 超过创建时间起算的上限即拒绝。
+	// 返回零值 token, 避免调用方在鉴权失败后继续使用该行。
+	if time.Since(time.Time(ut.CreatedAt)) > us.TokenMaxLifetime() {
+		return &model.User{}, &model.UserToken{}
 	}
 	if ut.ExpiredAt < time.Now().Unix() {
 		return u, ut
@@ -405,6 +413,15 @@ func (us *UserService) formatUsername(username string) string {
 	return username
 }
 
+// TokenMaxLifetime 返回会话绝对寿命上限。
+// 配置为 0(或未配置)时回退到默认 30 天; 0 表示使用默认值, 而不是不限制。
+func (us *UserService) TokenMaxLifetime() time.Duration {
+	if Config == nil || Config.App.TokenMaxLifetime <= 0 {
+		return defaultTokenMaxLifetime
+	}
+	return Config.App.TokenMaxLifetime
+}
+
 // UserTokenExpireTimestamp 生成用户token过期时间
 func (us *UserService) UserTokenExpireTimestamp() int64 {
 	exp := Config.App.TokenExpire
@@ -414,6 +431,8 @@ func (us *UserService) UserTokenExpireTimestamp() int64 {
 	return time.Now().Add(exp).Unix()
 }
 
+// RefreshAccessToken 滑动续期, 只延后 expired_at;
+// 会话绝对寿命由 InfoByAccessToken 统一校验, 续期不能突破该上限。
 func (us *UserService) RefreshAccessToken(ut *model.UserToken) {
 	ut.ExpiredAt = us.UserTokenExpireTimestamp()
 	DB.Model(ut).Update("expired_at", ut.ExpiredAt)

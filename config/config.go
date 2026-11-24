@@ -18,9 +18,8 @@ type App struct {
 	RegisterStatus   int           `mapstructure:"register-status"`
 	ShowSwagger      int           `mapstructure:"show-swagger"`
 	TokenExpire      time.Duration `mapstructure:"token-expire"`
+	TokenMaxLifetime time.Duration `mapstructure:"token-max-lifetime"` // 0 表示使用默认值(30天), 不是不限制
 	WebSso           bool          `mapstructure:"web-sso"`
-	CaptchaThreshold int           `mapstructure:"captcha-threshold"`
-	BanThreshold     int           `mapstructure:"ban-threshold"`
 }
 type Admin struct {
 	Title           string `mapstructure:"title"`

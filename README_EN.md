@@ -98,7 +98,7 @@ Navigate to `http://your-ip:21114/_admin` in your browser, click "Login with Git
 ## Local Development & Build
 
 ### Prerequisites
-- Go 1.23+
+- Go 1.25+
 - Node.js 22+ & pnpm 11.x
 
 ### Build & Run

@@ -6,7 +6,6 @@ ARG BUILDARCH=amd64
 # The Go version is intentionally not a build arg: a variable would let the
 # builder image drift to a different digest. Refresh via Dependabot's docker
 # ecosystem, or re-resolve explicitly with `docker buildx imagetools inspect`.
-# FROM golang:1.22-alpine AS builder
 FROM crazymax/xgo:1.25@sha256:7c7f13514c5212ddb34e5771908b873dfef3361c1bad089de00c1af46c77af25 AS builder-backend
 
 # Set up working directory

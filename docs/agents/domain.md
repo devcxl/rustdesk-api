@@ -27,7 +27,7 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 
 Not domain documentation: this is orientation for finding your way around the code. Keep `CONTEXT.md` implementation-free.
 
-Go 1.23, single module `github.com/lejianwen/rustdesk-api/v2`. Layering, top to bottom:
+Go 1.25, single module `github.com/lejianwen/rustdesk-api/v2`. Layering, top to bottom:
 
 ```
 cmd/apimain.go        entrypoint, bootstraps config and DB seeding

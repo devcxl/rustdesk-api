@@ -60,7 +60,7 @@ jobs:
           pnpm build
 
       - name: Verify Go Build
-        run: go build -o /dev/null ./cmd/apimain.go
+        run: go build -o /dev/null ./cmd
 
       - name: Upload admin frontend
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

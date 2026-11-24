@@ -116,7 +116,7 @@ pnpm build
 cd ..
 
 # 2. 编译运行 Go 后端服务
-go run cmd/apimain.go
+go run ./cmd
 ```
 
 或直接执行自动化打包脚本：

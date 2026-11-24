@@ -110,7 +110,7 @@ pnpm build
 cd ..
 
 # 2. Build and run backend
-go run cmd/apimain.go
+go run ./cmd
 ```
 
 Or run the all-in-one build script:

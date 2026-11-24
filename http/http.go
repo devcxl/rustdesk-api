@@ -36,7 +36,7 @@ func ApiInit() {
 	g.NoRoute(func(c *gin.Context) {
 		c.String(http.StatusNotFound, "404 not found")
 	})
-	g.Use(middleware.SecurityHeaders(), middleware.SensitiveRateLimit(), middleware.BodyLimit(maxRequestBodyBytes), middleware.Logger(), middleware.Limiter(), gin.Recovery())
+	g.Use(middleware.SecurityHeaders(), middleware.SensitiveRateLimit(), middleware.BodyLimit(maxRequestBodyBytes), middleware.Logger(), gin.Recovery())
 	router.WebInit(g)
 	router.Init(g)
 	router.ApiInit(g)

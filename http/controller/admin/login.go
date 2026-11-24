@@ -8,6 +8,7 @@ import (
 	adResp "github.com/lejianwen/rustdesk-api/v2/http/response/admin"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
+	"github.com/lejianwen/rustdesk-api/v2/utils"
 )
 
 type Login struct {
@@ -81,16 +82,19 @@ func (ct *Login) OidcAuth(c *gin.Context) {
 		return
 	}
 
+	binding := utils.RandomString(32)
 	service.AllService.OauthService.SetOauthCache(state, &service.OauthCacheItem{
-		Action:     service.OauthActionTypeLogin,
-		Op:         f.Op,
-		Id:         f.Id,
-		DeviceType: "webadmin",
-		DeviceOs:   f.DeviceInfo.Os,
-		Uuid:       f.Uuid,
-		Verifier:   verifier,
-		Nonce:      nonce,
+		Action:         service.OauthActionTypeLogin,
+		Op:             f.Op,
+		Id:             f.Id,
+		DeviceType:     "webadmin",
+		DeviceOs:       f.DeviceInfo.Os,
+		Uuid:           f.Uuid,
+		Verifier:       verifier,
+		Nonce:          nonce,
+		BrowserBinding: binding,
 	}, 5*60)
+	api.SetAdminOAuthBindingCookie(c, binding)
 
 	response.Success(c, gin.H{
 		"code": state,

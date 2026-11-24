@@ -138,3 +138,9 @@ sudo chmod 0640 /var/lib/rustdesk-api/conf/config.yaml
   - `aarch64-linux-musl-cross.tgz`：`c909817856d6ceda86aa510894fa3527eac7989f0ef6e87b5721c58737a06c38`
   - `armv7l-linux-musleabihf-cross.tgz`：`f49f1a15ec62364ef5e4edb4e3990c0e1d2d1a54c90153b8f3869dad63328a10`
 - 升级工具链时需人工下载并复核压缩包内容，再同步修改脚本中的哈希常量与注释日期；不要仅凭下载结果直接替换哈希。
+
+## 11. OAuth 登录入口限制
+
+- 管理台登录已绑定发起浏览器：`POST /api/admin/oidc/auth` 会设置 5 分钟有效的 HttpOnly/SameSite=Lax cookie（`rustdesk_admin_oauth_binding`），只有同一浏览器能完成回调与 `auth-query` 兑换。把管理台登录链接发给别人不会替对方完成登录。
+- RustDesk 桌面端仍是 state-only 流程（跨浏览器授权 + 桌面轮询）：**只从你信任的客户端发起登录，不要打开他人发送的 GitHub 授权链接**。这是 ADR-0001 中明确接受的风险。
+- 公开的 OAuth 发起/回调已有按 IP 限流与 5 分钟 state 过期；不要把 21114 直接暴露公网。

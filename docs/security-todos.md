@@ -13,7 +13,7 @@
 | 4 | 匿名 OAuth 回调重放放大外部请求 | 已缓解 | GitHub 应用限流/滥用策略、入口限流 |
 | 5 | 匿名 `/api/sysinfo` 持久行无限增长 | 已缓解 | 数据库容量/备份增长与入口限流 |
 | 6 | 畸形带凭据代理 URL 写入日志 | 已修复 | 部署代理配置与日志读取范围 |
-| 7 | OAuth state 未绑定轮询客户端 | 设计提案（待决策） | GitHub 授权/自动批准行为、产品决策 |
+| 7 | OAuth state 未绑定轮询客户端 | 已接受（C）+ 管理台浏览器绑定 | 桌面端 state-only 风险由 Owner 接受 |
 | 8 | 管理台缺少防框架头（clickjacking） | 已修复 | 反代是否覆盖/补充响应头 |
 | 9 | 发布工作流对可变第三方引用授予写权限 | 代码已修复；托管设置待开 | GitHub 仓库 tag/environment 保护、Dependabot alerts |
 | 10 | 构建工具链/基础镜像未固定摘要 | 已修复（TOFU） | 后续通过 Dependabot 更新 digest |
@@ -51,8 +51,9 @@
 - 通过标准：任何日志/错误响应中都不出现代理 userinfo。
 
 ### 7. OAuth state 与轮询客户端绑定
-- 设计提案已完成：`docs/adr/0001-oauth-polling-binding.md`（设备授权码、服务端轮询密钥、接受风险三选一，推荐设备授权码）。
-- 仍需产品决策；跟踪：<https://github.com/devcxl/rustdesk-api/issues/29>
+- 决策：采用 **C（接受桌面端风险 + 文档/入口限制）**；ADR 状态已更新为 Accepted。
+- 管理台登录已绑定发起浏览器的 HttpOnly cookie（`BrowserBinding`），回调与轮询兑换都校验；跨浏览器/攻击者发起的 state 无法兑换。
+- 桌面客户端仍为 state-only；Owner 不应打开陌生授权链接。跟踪：<https://github.com/devcxl/rustdesk-api/issues/29>
 - 核实：GitHub 对已授权应用的自动批准行为；是否要求 Owner 通过可信客户端发起。
 - 通过标准：未持有发起方凭据的第三方无法兑换已完成授权的 state，且桌面端流程仍可用。
 
@@ -84,7 +85,7 @@
 
 待处理：
 
-- #29 OAuth state 绑定（已有 ADR，待决策）。
+- #29 已按方案 C 处理：管理台浏览器绑定 + 文档；桌面端风险已接受。
 - #30 托管侧 tag/environment 保护与 action 白名单（Dependabot alerts 与 security updates 已通过 API 开启，代码已固定 SHA）。
 - #31 已修复：镜像 digest 与工具链哈希固定（`cf01be6`）。
 - #39 已修复：启动时自动归一化/去重并建立唯一索引（`0c0fc2e`）。

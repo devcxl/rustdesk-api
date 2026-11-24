@@ -40,6 +40,9 @@ type OauthCacheItem struct {
 	Email      string `json:"email"`
 	Verifier   string `json:"verifier"`
 	Nonce      string `json:"nonce"`
+	// BrowserBinding is an HttpOnly cookie secret for webadmin flows; it is
+	// never serialized to clients and remains empty for desktop clients.
+	BrowserBinding string `json:"-"`
 }
 
 func (oci *OauthCacheItem) ToOauthUser() *model.OauthUser {

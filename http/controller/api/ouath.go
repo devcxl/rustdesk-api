@@ -87,6 +87,13 @@ func (o *Oauth) OidcAuthQueryPre(c *gin.Context) (*model.User, *model.UserToken)
 		return nil, nil
 	}
 
+	// webadmin 流程必须由发起授权的同一浏览器兑换；桌面端没有绑定.
+	if !browserBindingMatches(c, v.BrowserBinding) {
+		service.AllService.OauthService.DeleteOauthCache(q.Code)
+		response.Error(c, response.TranslateMsg(c, "OauthExpired"))
+		return nil, nil
+	}
+
 	// 如果 UserId 为 0，说明还在授权中
 	if v.UserId == 0 {
 		c.JSON(http.StatusOK, gin.H{"message": "Authorization in progress, please login and bind", "error": "No authed oidc is found"})
@@ -182,6 +189,14 @@ func (o *Oauth) OauthCallback(c *gin.Context) {
 	if oauthCache == nil {
 		c.HTML(http.StatusOK, "oauth_fail.html", gin.H{
 			"message": "OauthExpired",
+		})
+		return
+	}
+	// webadmin 登录只能在发起授权的浏览器中完成；桌面端不设置绑定.
+	if !browserBindingMatches(c, oauthCache.BrowserBinding) {
+		oauthService.DeleteOauthCache(cacheKey)
+		c.HTML(http.StatusOK, "oauth_fail.html", gin.H{
+			"message": "OauthFailed",
 		})
 		return
 	}

@@ -10,6 +10,9 @@ import (
 	"strings"
 )
 
+// maxRequestBodyBytes caps every request body before handlers run (8 MiB).
+const maxRequestBodyBytes = 8 << 20
+
 func ApiInit() {
 	gin.SetMode(global.Config.Gin.Mode)
 	g := gin.New()
@@ -33,7 +36,7 @@ func ApiInit() {
 	g.NoRoute(func(c *gin.Context) {
 		c.String(http.StatusNotFound, "404 not found")
 	})
-	g.Use(middleware.Logger(), middleware.Limiter(), gin.Recovery())
+	g.Use(middleware.SecurityHeaders(), middleware.SensitiveRateLimit(), middleware.BodyLimit(maxRequestBodyBytes), middleware.Logger(), middleware.Limiter(), gin.Recovery())
 	router.WebInit(g)
 	router.Init(g)
 	router.ApiInit(g)

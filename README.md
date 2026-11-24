@@ -104,7 +104,7 @@ docker compose up -d
 ## 本地编译与开发
 
 ### 依赖环境
-- Go 1.23+
+- Go 1.25+
 - Node.js 22+ & pnpm 11.x
 
 ### 编译运行

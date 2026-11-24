@@ -13,9 +13,9 @@
 | 4 | 匿名 OAuth 回调重放放大外部请求 | 已缓解 | GitHub 应用限流/滥用策略、入口限流 |
 | 5 | 匿名 `/api/sysinfo` 持久行无限增长 | 已缓解 | 数据库容量/备份增长与入口限流 |
 | 6 | 畸形带凭据代理 URL 写入日志 | 已修复 | 部署代理配置与日志读取范围 |
-| 7 | OAuth state 未绑定轮询客户端 | 未修复 | GitHub 授权/自动批准行为、产品决策 |
+| 7 | OAuth state 未绑定轮询客户端 | 设计提案（待决策） | GitHub 授权/自动批准行为、产品决策 |
 | 8 | 管理台缺少防框架头（clickjacking） | 已修复 | 反代是否覆盖/补充响应头 |
-| 9 | 发布工作流对可变第三方引用授予写权限 | 已缓解 | 托管 token 策略、tag/environment 保护 |
+| 9 | 发布工作流对可变第三方引用授予写权限 | 代码已修复；托管设置待开 | GitHub 仓库 tag/environment 保护、Dependabot alerts |
 | 10 | 构建工具链/基础镜像未固定摘要 | 未修复 | 工具链分发方与镜像发布方的可信度 |
 
 ## 逐项说明与核实方式
@@ -51,7 +51,8 @@
 - 通过标准：任何日志/错误响应中都不出现代理 userinfo。
 
 ### 7. OAuth state 与轮询客户端绑定
-- 未修复，需产品决策。跟踪：<https://github.com/devcxl/rustdesk-api/issues/29>
+- 设计提案已完成：`docs/adr/0001-oauth-polling-binding.md`（设备授权码、服务端轮询密钥、接受风险三选一，推荐设备授权码）。
+- 仍需产品决策；跟踪：<https://github.com/devcxl/rustdesk-api/issues/29>
 - 核实：GitHub 对已授权应用的自动批准行为；是否要求 Owner 通过可信客户端发起。
 - 通过标准：未持有发起方凭据的第三方无法兑换已完成授权的 state，且桌面端流程仍可用。
 
@@ -61,8 +62,8 @@
 - 通过标准：`/_admin/` 与 OAuth 结果页在跨源 iframe 中被拒绝。
 
 ### 9. 发布工作流写权限
-- 已缓解：每 job 最小权限、`persist-credentials: false`、Docker 仅标签发布、SHA-256 校验和、provenance。
-- 未完成：action 仍未固定到 SHA；托管 tag/environment 保护需在 GitHub 设置。跟踪：<https://github.com/devcxl/rustdesk-api/issues/30>
+- 已完成：每 job 最小权限、`persist-credentials: false`、Docker 仅标签发布、SHA-256 校验和、provenance，以及全部 action 固定到 40 位 commit SHA + govulncheck + Dependabot 配置。
+- 仍需 Owner 在 GitHub 设置中开启 Dependabot alerts/security updates、tag/environment 保护，并按需允许 `golang/govulncheck-action`。跟踪：<https://github.com/devcxl/rustdesk-api/issues/30>
 - 通过标准：所有 `uses:` 为 40 位 SHA；发布 job 需要受保护 ref/环境；token 权限与 job 匹配。
 
 ### 10. 构建工具链/基础镜像摘要
@@ -72,13 +73,22 @@
 
 ## 其他跟踪事项（非 needs-validation）
 
-- #32 管理端 CRUD Owner 过滤与遗留非 Owner 令牌
-- #33 OAuth 绑定流程加固（BindConfirm / op / verified email）
-- #34 管理台 `id` 与 `row_id` 字段不匹配（功能缺陷）
-- #35 开发镜像 `COPY . .` 可能打包本地 conf 密钥
-- #36 仓库内测试 RSA 私钥改为运行时生成
-- #37 统一令牌过期语义并增加会话绝对上限
-- #38 处理已失效的 LoginLimiter 与验证码死代码
+已修复：
+
+- #32 管理端 CRUD 按 Owner 过滤（`d37df1c`）；升级前如需管理遗留行，先归并 `user_id`。
+- #33 OAuth 绑定加固（`8de12f8`）；遗留 `user_thirds` op 变体需要一次性迁移（见 #39）。
+- #34 管理台 `id`/`row_id` 契约修复（`76d25b2`）。
+- #35 dev 镜像不再打包本地 conf（`043f8bb`）。
+- #36 测试 RSA 私钥已移除（`043f8bb`）。
+- #37 会话绝对寿命 + 管理端 JWT 过期对齐（`1a8edc8`）；升级后超过 30 天的旧令牌需重新登录。
+- #38 LoginLimiter/验证码死代码与无效配置已删除（`04b6417`）。
+
+待处理：
+
+- #29 OAuth state 绑定（已有 ADR，待决策）。
+- #30 托管侧 Dependabot/tag 保护设置（代码已固定 SHA）。
+- #31 工具链/基础镜像摘要固定（需可信摘要来源）。
+- #39 遗留 `user_thirds` op 迁移与唯一约束。
 
 ## 复核命令
 

@@ -12,7 +12,7 @@ type UserThird struct {
 	// OauthType  	   	string 		`json:"oauth_type" gorm:"not null;"`
 	ThirdType string `json:"third_type" gorm:"default:'';not null;"` //deprecated
 	OauthType string `json:"oauth_type" gorm:"default:'';not null;"`
-	Op        string `json:"op" gorm:"default:'';not null;"`
+	Op        string `json:"op" gorm:"default:'';not null;uniqueIndex:idx_user_third_op_open_id"`
 	TimeModel
 }
 

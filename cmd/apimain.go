@@ -169,6 +169,16 @@ func DatabaseAutoUpdate() {
 		}
 	}
 
+	// Normalize legacy user_thirds rows regardless of the stored version:
+	// collapse op variants to "github", drop unauthenticatable/duplicate
+	// bindings and ensure the composite unique index exists. Idempotent.
+	normalized, removed, err := NormalizeUserThirds(db)
+	if err != nil {
+		global.Logger.Errorf("normalize user_thirds failed: %v", err)
+	} else {
+		global.Logger.Debugf("normalize user_thirds done: %d op updates, %d rows removed", normalized, removed)
+	}
+
 	if !db.Migrator().HasTable(&model.Version{}) {
 		Migrate(uint(version))
 	} else {
@@ -184,7 +194,8 @@ func DatabaseAutoUpdate() {
 			//oauths 表的 oauth_type 字段设置为 op同样的值
 			db.Exec("update oauths set oauth_type = op")
 			db.Exec("update oauths set issuer = 'https://accounts.google.com' where op = 'google'")
-			db.Exec("update user_thirds set oauth_type = third_type, op = third_type")
+			// op normalization is handled by NormalizeUserThirds; keep only oauth_type here
+			db.Exec("update user_thirds set oauth_type = third_type")
 			//通过email迁移旧的google授权
 			uts := make([]model.UserThird, 0)
 			db.Where("oauth_type = ?", "google").Find(&uts)

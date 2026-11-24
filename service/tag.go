@@ -69,6 +69,13 @@ func (s *TagService) InfoById(id uint) *model.Tag {
 	return u
 }
 
+// InfoByUserIdAndId 按用户 id 和标签 id 查询, 用于管理端 Owner 范围校验
+func (s *TagService) InfoByUserIdAndId(userId, id uint) *model.Tag {
+	u := &model.Tag{}
+	DB.Where("user_id = ? and id = ?", userId, id).First(u)
+	return u
+}
+
 func (s *TagService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *model.TagList) {
 	res = &model.TagList{}
 	res.Page = int64(page)

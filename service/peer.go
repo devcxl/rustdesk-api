@@ -25,6 +25,13 @@ func (ps *PeerService) InfoByRowId(id uint) *model.Peer {
 	return p
 }
 
+// InfoByUserIdAndRowId 按用户 id 和 row_id 查询, 用于管理端 Owner 范围校验
+func (ps *PeerService) InfoByUserIdAndRowId(userId, id uint) *model.Peer {
+	p := &model.Peer{}
+	DB.Where("user_id = ? and row_id = ?", userId, id).First(p)
+	return p
+}
+
 // FindByUserIdAndUuid 根据用户id和uuid查找peer
 func (ps *PeerService) FindByUserIdAndUuid(uuid string, userId uint) *model.Peer {
 	p := &model.Peer{}
@@ -126,11 +133,23 @@ func (ps *PeerService) Delete(u *model.Peer) error {
 
 // GetUuidAndIdListByIDs 根据ids获取uuid和设备id列表, 空值会被过滤
 func (ps *PeerService) GetUuidAndIdListByIDs(ids []uint) (uuids []string, deviceIds []string, err error) {
+	return ps.getUuidAndIdList(func(tx *gorm.DB) {
+		tx.Where("row_id in (?)", ids)
+	})
+}
+
+// GetUuidAndIdListByUserIdAndIDs 根据用户和ids获取uuid和设备id列表, 空值会被过滤
+func (ps *PeerService) GetUuidAndIdListByUserIdAndIDs(userId uint, ids []uint) (uuids []string, deviceIds []string, err error) {
+	return ps.getUuidAndIdList(func(tx *gorm.DB) {
+		tx.Where("user_id = ? and row_id in (?)", userId, ids)
+	})
+}
+
+func (ps *PeerService) getUuidAndIdList(where func(tx *gorm.DB)) (uuids []string, deviceIds []string, err error) {
 	var peers []*model.Peer
-	err = DB.Model(&model.Peer{}).
-		Select("uuid", "id").
-		Where("row_id in (?)", ids).
-		Find(&peers).Error
+	tx := DB.Model(&model.Peer{}).Select("uuid", "id")
+	where(tx)
+	err = tx.Find(&peers).Error
 	for _, peer := range peers {
 		if peer.Uuid != "" {
 			uuids = append(uuids, peer.Uuid)
@@ -142,6 +161,13 @@ func (ps *PeerService) GetUuidAndIdListByIDs(ids []uint) (uuids []string, device
 	return
 }
 
+// CountByUserIdAndRowIds 统计属于指定用户的设备数量, 用于批量操作前的归属校验
+func (ps *PeerService) CountByUserIdAndRowIds(userId uint, ids []uint) int64 {
+	var count int64
+	DB.Model(&model.Peer{}).Where("user_id = ? and row_id in (?)", userId, ids).Count(&count)
+	return count
+}
+
 // BatchDelete 批量删除, 同时也应该删除token
 func (ps *PeerService) BatchDelete(ids []uint) error {
 	uuids, deviceIds, err := ps.GetUuidAndIdListByIDs(ids)
@@ -149,6 +175,20 @@ func (ps *PeerService) BatchDelete(ids []uint) error {
 		return err
 	}
 	err = DB.Where("row_id in (?)", ids).Delete(&model.Peer{}).Error
+	if err != nil {
+		return err
+	}
+	// 删除token, 同时按 uuid 和 id 匹配
+	return AllService.UserService.FlushTokenByUuidsAndDeviceIds(uuids, deviceIds)
+}
+
+// BatchDeleteByUserId 批量删除指定用户的设备, 不会触碰其他用户的行, 同时也应该删除token
+func (ps *PeerService) BatchDeleteByUserId(userId uint, ids []uint) error {
+	uuids, deviceIds, err := ps.GetUuidAndIdListByUserIdAndIDs(userId, ids)
+	if err != nil {
+		return err
+	}
+	err = DB.Where("user_id = ? and row_id in (?)", userId, ids).Delete(&model.Peer{}).Error
 	if err != nil {
 		return err
 	}

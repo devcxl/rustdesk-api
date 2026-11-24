@@ -18,7 +18,8 @@ type Tag struct {
 func (ct *Tag) Detail(c *gin.Context) {
 	id := c.Param("id")
 	iid, _ := strconv.Atoi(id)
-	t := service.AllService.TagService.InfoById(uint(iid))
+	u := service.AllService.UserService.CurUser(c)
+	t := service.AllService.TagService.InfoByUserIdAndId(u.Id, uint(iid))
 	if t.Id > 0 {
 		response.Success(c, t)
 		return
@@ -39,10 +40,12 @@ func (ct *Tag) Create(c *gin.Context) {
 		return
 	}
 	u := service.AllService.UserService.CurUser(c)
-	t := f.ToTag()
-	if t.UserId == 0 {
-		t.UserId = u.Id
+	if f.UserId != 0 && f.UserId != u.Id {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
 	}
+	t := f.ToTag()
+	t.UserId = u.Id
 	err := service.AllService.TagService.Create(t)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
@@ -81,16 +84,18 @@ func (ct *Tag) Update(c *gin.Context) {
 		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
 		return
 	}
-	ex := service.AllService.TagService.InfoById(f.Id)
+	u := service.AllService.UserService.CurUser(c)
+	if f.UserId != 0 && f.UserId != u.Id {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
+	ex := service.AllService.TagService.InfoByUserIdAndId(u.Id, f.Id)
 	if ex.Id == 0 {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return
 	}
 	t := f.ToTag()
-	u := service.AllService.UserService.CurUser(c)
-	if t.UserId == 0 {
-		t.UserId = u.Id
-	}
+	t.UserId = u.Id
 	err := service.AllService.TagService.Update(t)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
@@ -112,7 +117,8 @@ func (ct *Tag) Delete(c *gin.Context) {
 		response.Fail(c, 101, errList[0])
 		return
 	}
-	ex := service.AllService.TagService.InfoById(f.Id)
+	u := service.AllService.UserService.CurUser(c)
+	ex := service.AllService.TagService.InfoByUserIdAndId(u.Id, f.Id)
 	if ex.Id == 0 {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return

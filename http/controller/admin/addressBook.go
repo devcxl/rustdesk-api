@@ -19,7 +19,8 @@ type AddressBook struct {
 func (ct *AddressBook) Detail(c *gin.Context) {
 	id := c.Param("id")
 	iid, _ := strconv.Atoi(id)
-	t := service.AllService.AddressBookService.InfoByRowId(uint(iid))
+	u := service.AllService.UserService.CurUser(c)
+	t := service.AllService.AddressBookService.InfoByUserIdAndRowId(u.Id, uint(iid))
 	if t.RowId > 0 {
 		response.Success(c, t)
 		return
@@ -40,10 +41,12 @@ func (ct *AddressBook) Create(c *gin.Context) {
 		return
 	}
 	u := service.AllService.UserService.CurUser(c)
-	t := f.ToAddressBook()
-	if t.UserId == 0 {
-		t.UserId = u.Id
+	if !addressBookOwnershipAllowed(u.Id, f.UserId) || !addressBookOwnershipAllowed(u.Id, f.UserIds...) {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
 	}
+	t := f.ToAddressBook()
+	t.UserId = u.Id
 
 	ex := service.AllService.AddressBookService.InfoByUserIdAndIdAndCid(t.UserId, t.Id, t.CollectionId)
 	if ex.RowId > 0 {
@@ -72,15 +75,23 @@ func (ct *AddressBook) BatchCreate(c *gin.Context) {
 		return
 	}
 	u := service.AllService.UserService.CurUser(c)
+	if !addressBookOwnershipAllowed(u.Id, f.UserId) {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
 	if len(f.UserIds) == 0 {
 		f.UserIds = []uint{u.Id}
 	}
+	if !addressBookOwnershipAllowed(u.Id, f.UserIds...) {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
+	// 单 Owner 模式下只允许归属当前 Owner, 归一化以避免重复行
+	f.UserIds = []uint{u.Id}
 
 	ts := f.ToAddressBooks()
 	for _, t := range ts {
-		if t.UserId == 0 {
-			t.UserId = u.Id
-		}
+		t.UserId = u.Id
 		ex := service.AllService.AddressBookService.InfoByUserIdAndIdAndCid(t.UserId, t.Id, t.CollectionId)
 		if ex.RowId == 0 {
 			service.AllService.AddressBookService.Create(t)
@@ -129,16 +140,18 @@ func (ct *AddressBook) Update(c *gin.Context) {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return
 	}
-	ex := service.AllService.AddressBookService.InfoByRowId(f.RowId)
+	u := service.AllService.UserService.CurUser(c)
+	if !addressBookOwnershipAllowed(u.Id, f.UserId) || !addressBookOwnershipAllowed(u.Id, f.UserIds...) {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
+	ex := service.AllService.AddressBookService.InfoByUserIdAndRowId(u.Id, f.RowId)
 	if ex.RowId == 0 {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return
 	}
 	t := f.ToAddressBook()
-	u := service.AllService.UserService.CurUser(c)
-	if t.UserId == 0 {
-		t.UserId = u.Id
-	}
+	t.UserId = u.Id
 	err := service.AllService.AddressBookService.UpdateAll(t)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
@@ -160,7 +173,8 @@ func (ct *AddressBook) Delete(c *gin.Context) {
 		response.Fail(c, 101, errList[0])
 		return
 	}
-	t := service.AllService.AddressBookService.InfoByRowId(f.RowId)
+	u := service.AllService.UserService.CurUser(c)
+	t := service.AllService.AddressBookService.InfoByUserIdAndRowId(u.Id, f.RowId)
 	if t.RowId == 0 {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return
@@ -181,13 +195,15 @@ func (ct *AddressBook) BatchCreateFromPeers(c *gin.Context) {
 		return
 	}
 	u := service.AllService.UserService.CurUser(c)
-	if f.UserId == 0 {
-		f.UserId = u.Id
+	if !addressBookOwnershipAllowed(u.Id, f.UserId) {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
 	}
+	f.UserId = u.Id
 
 	pl := int64(len(f.PeerIds))
 	peers := service.AllService.PeerService.List(1, uint(pl), func(tx *gorm.DB) {
-		tx.Where("row_id in ?", f.PeerIds)
+		tx.Where("row_id in ? and user_id = ?", f.PeerIds, u.Id)
 	})
 	if peers.Total == 0 || pl != peers.Total {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
@@ -207,4 +223,14 @@ func (ct *AddressBook) BatchCreateFromPeers(c *gin.Context) {
 		service.AllService.AddressBookService.Create(ab)
 	}
 	response.Success(c, nil)
+}
+
+// addressBookOwnershipAllowed 判断请求体中的归属 id 是否为空(随当前 Owner) 或等于当前 Owner
+func addressBookOwnershipAllowed(ownerId uint, userIds ...uint) bool {
+	for _, userId := range userIds {
+		if userId != 0 && userId != ownerId {
+			return false
+		}
+	}
+	return true
 }

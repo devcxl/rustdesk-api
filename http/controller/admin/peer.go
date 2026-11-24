@@ -28,9 +28,10 @@ type Peer struct {
 func (ct *Peer) Detail(c *gin.Context) {
 	id := c.Param("id")
 	iid, _ := strconv.Atoi(id)
-	u := service.AllService.PeerService.InfoByRowId(uint(iid))
-	if u.RowId > 0 {
-		response.Success(c, u)
+	u := service.AllService.UserService.CurUser(c)
+	p := service.AllService.PeerService.InfoByUserIdAndRowId(u.Id, uint(iid))
+	if p.RowId > 0 {
+		response.Success(c, p)
 		return
 	}
 	response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
@@ -147,8 +148,14 @@ func (ct *Peer) Update(c *gin.Context) {
 		response.Fail(c, 101, errList[0])
 		return
 	}
-	u := f.ToPeer()
-	err := service.AllService.PeerService.Update(u)
+	u := service.AllService.UserService.CurUser(c)
+	ex := service.AllService.PeerService.InfoByUserIdAndRowId(u.Id, f.RowId)
+	if ex.RowId == 0 {
+		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
+		return
+	}
+	p := f.ToPeer()
+	err := service.AllService.PeerService.Update(p)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
 		return
@@ -179,9 +186,10 @@ func (ct *Peer) Delete(c *gin.Context) {
 		response.Fail(c, 101, errList[0])
 		return
 	}
-	u := service.AllService.PeerService.InfoByRowId(f.RowId)
-	if u.RowId > 0 {
-		err := service.AllService.PeerService.Delete(u)
+	u := service.AllService.UserService.CurUser(c)
+	p := service.AllService.PeerService.InfoByUserIdAndRowId(u.Id, f.RowId)
+	if p.RowId > 0 {
+		err := service.AllService.PeerService.Delete(p)
 		if err == nil {
 			response.Success(c, nil)
 			return
@@ -213,7 +221,22 @@ func (ct *Peer) BatchDelete(c *gin.Context) {
 		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
 		return
 	}
-	err := service.AllService.PeerService.BatchDelete(f.RowIds)
+	u := service.AllService.UserService.CurUser(c)
+	ids := make([]uint, 0, len(f.RowIds))
+	seen := make(map[uint]struct{}, len(f.RowIds))
+	for _, id := range f.RowIds {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	// 批量删除前校验所有设备都属于当前 Owner, 避免误删遗留的他人行
+	if service.AllService.PeerService.CountByUserIdAndRowIds(u.Id, ids) != int64(len(ids)) {
+		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
+		return
+	}
+	err := service.AllService.PeerService.BatchDeleteByUserId(u.Id, ids)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
 		return

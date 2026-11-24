@@ -35,6 +35,13 @@ func (s *AddressBookService) InfoByRowId(id uint) *model.AddressBook {
 	return p
 }
 
+// InfoByUserIdAndRowId 按用户 id 和 row_id 查询, 用于管理端 Owner 范围校验
+func (s *AddressBookService) InfoByUserIdAndRowId(userId, rowId uint) *model.AddressBook {
+	p := &model.AddressBook{}
+	DB.Where("user_id = ? and row_id = ?", userId, rowId).First(p)
+	return p
+}
+
 func (s *AddressBookService) ListByUserId(userId, page, pageSize uint) (res *model.AddressBookList) {
 	res = s.List(page, pageSize, func(tx *gorm.DB) {
 		tx.Where("user_id = ?", userId)

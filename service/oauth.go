@@ -74,6 +74,14 @@ const (
 	maxOauthOpLen    = 32
 )
 
+// NormalizeOp maps any client-supplied provider identifier onto the canonical
+// provider value. GitHub is currently the only supported provider, so empty,
+// unknown and case-variant values all collapse to github; without this, each
+// variant could create its own row in user_thirds for the same identity.
+func NormalizeOp(op string) string {
+	return model.OauthTypeGithub
+}
+
 // ValidateOidcAuthParams rejects OAuth init requests carrying oversized fields.
 // Values that are too long are never stored in the OAuth cache.
 func ValidateOidcAuthParams(id, uuid, op, deviceName, deviceOs, deviceType string) error {
@@ -165,7 +173,8 @@ func (svc *OauthService) GithubProvider() *oidc.Provider {
 
 // GetOauthConfig 获取 GitHub OAuth2 配置
 func (svc *OauthService) GetOauthConfig(op string) (err error, oauthInfo *model.Oauth, oauthConfig *oauth2.Config, provider *oidc.Provider) {
-	oauthInfo = svc.InfoByOp(model.OauthTypeGithub)
+	op = NormalizeOp(op)
+	oauthInfo = svc.InfoByOp(op)
 	if oauthInfo.Id == 0 || oauthInfo.ClientId == "" || oauthInfo.ClientSecret == "" {
 		return errors.New("ConfigNotFound"), nil, nil, nil
 	}
@@ -332,7 +341,26 @@ func (svc *OauthService) githubCallback(ctx context.Context, oauthConfig *oauth2
 	if err != nil {
 		return err, nil
 	}
+	// Account linking and auto-registration match existing users by email, so
+	// only a verified primary address may be kept. GitHub's profile payload
+	// also exposes a public email that is not guaranteed to be verified; it
+	// must never be trusted for identity, hence clear it when verification
+	// did not succeed.
+	clearUnverifiedEmail(user)
 	return nil, user.ToOauthUser()
+}
+
+// clearUnverifiedEmail enforces the invariant that an OAuth profile may only
+// carry an email that the provider has confirmed as a verified primary
+// address. Any unverified address is removed before it can be matched against
+// an existing account.
+func clearUnverifiedEmail(user *model.GithubUser) {
+	if user == nil {
+		return
+	}
+	if !user.VerifiedEmail {
+		user.Email = ""
+	}
 }
 
 // splitCsv 拆分逗号分隔的配置项，去除空白项与首尾空格
@@ -448,6 +476,7 @@ func (svc *OauthService) checkGithubAccess(client *http.Client, login string) er
 
 // Callback: 通过授权码与 verifier 获取用户信息
 func (svc *OauthService) Callback(ctx context.Context, code, verifier, op, nonce string) (err error, oauthUser *model.OauthUser) {
+	op = NormalizeOp(op)
 	err, _, oauthConfig, provider := svc.GetOauthConfig(op)
 	if err != nil {
 		return err, nil
@@ -457,12 +486,13 @@ func (svc *OauthService) Callback(ctx context.Context, code, verifier, op, nonce
 
 func (svc *OauthService) UserThirdInfo(op string, openId string) *model.UserThird {
 	ut := &model.UserThird{}
-	DB.Where("open_id = ? and op = ?", openId, op).First(ut)
+	DB.Where("open_id = ? and op = ?", openId, NormalizeOp(op)).First(ut)
 	return ut
 }
 
 func (svc *OauthService) BindOauthUser(userId uint, oauthUser *model.OauthUser, op string) error {
 	utr := &model.UserThird{}
+	op = NormalizeOp(op)
 	err, oauthType := svc.GetTypeByOp(op)
 	if err != nil {
 		return err
@@ -472,7 +502,7 @@ func (svc *OauthService) BindOauthUser(userId uint, oauthUser *model.OauthUser, 
 }
 
 func (svc *OauthService) UnBindOauthUser(userId uint, op string) error {
-	return svc.UnBindThird(op, userId)
+	return svc.UnBindThird(NormalizeOp(op), userId)
 }
 
 func (svc *OauthService) UnBindThird(op string, userId uint) error {

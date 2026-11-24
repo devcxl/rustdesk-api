@@ -41,8 +41,11 @@ func (o *Oauth) OidcAuth(c *gin.Context) {
 	}
 
 	oauthService := service.AllService.OauthService
+	// Persist the canonical provider so later lookups and identity rows cannot
+	// diverge on client-supplied op variants.
+	op := service.NormalizeOp(f.Op)
 
-	err, state, verifier, nonce, url := oauthService.BeginAuth(f.Op)
+	err, state, verifier, nonce, url := oauthService.BeginAuth(op)
 	if err != nil {
 		response.Error(c, response.TranslateMsg(c, err.Error()))
 		return
@@ -51,7 +54,7 @@ func (o *Oauth) OidcAuth(c *gin.Context) {
 	service.AllService.OauthService.SetOauthCache(state, &service.OauthCacheItem{
 		Action:     service.OauthActionTypeLogin,
 		Id:         f.Id,
-		Op:         f.Op,
+		Op:         op,
 		Uuid:       f.Uuid,
 		DeviceName: f.DeviceInfo.Name,
 		DeviceOs:   f.DeviceInfo.Os,
@@ -92,8 +95,16 @@ func (o *Oauth) OidcAuthQueryPre(c *gin.Context) (*model.User, *model.UserToken)
 
 	// 获取用户信息
 	u = service.AllService.UserService.InfoById(v.UserId)
-	if u == nil {
+	if u == nil || u.Id == 0 {
+		service.AllService.OauthService.DeleteOauthCache(q.Code)
 		response.Error(c, response.TranslateMsg(c, "UserNotFound"))
+		return nil, nil
+	}
+	// Fail closed for disabled or deleted accounts: never issue a fresh token
+	// (or a user_id=0 token row) for a cached identity that is no longer valid.
+	if !service.AllService.UserService.CheckUserEnable(u) {
+		service.AllService.OauthService.DeleteOauthCache(q.Code)
+		response.Error(c, response.TranslateMsg(c, "NoAccess"))
 		return nil, nil
 	}
 
@@ -193,7 +204,9 @@ func (o *Oauth) OauthCallback(c *gin.Context) {
 	}
 
 	nonce := oauthCache.Nonce
-	op := oauthCache.Op
+	// Normalize legacy/variant cached ops before any identity lookup or write.
+	op := service.NormalizeOp(oauthCache.Op)
+	oauthCache.Op = op
 	action := oauthCache.Action
 	verifier := oauthCache.Verifier
 	var user *model.User

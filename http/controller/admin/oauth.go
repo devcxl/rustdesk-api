@@ -33,14 +33,21 @@ func (o *Oauth) ToBind(c *gin.Context) {
 		return
 	}
 	u := service.AllService.UserService.CurUser(c)
+	if u == nil || u.Id == 0 {
+		response.Fail(c, 101, response.TranslateMsg(c, "NeedLogin"))
+		return
+	}
+	// Collapse provider variants onto the canonical provider before looking up
+	// or recording bindings, so variants cannot create duplicate identities.
+	op := service.NormalizeOp(f.Op)
 
-	utr := service.AllService.UserService.UserThirdInfo(u.Id, f.Op)
+	utr := service.AllService.UserService.UserThirdInfo(u.Id, op)
 	if utr.Id > 0 {
 		response.Fail(c, 101, response.TranslateMsg(c, "OauthHasBindOtherUser"))
 		return
 	}
 
-	err, state, verifier, nonce, url := service.AllService.OauthService.BeginAuth(f.Op)
+	err, state, verifier, nonce, url := service.AllService.OauthService.BeginAuth(op)
 	if err != nil {
 		response.Error(c, response.TranslateMsg(c, err.Error()))
 		return
@@ -48,7 +55,7 @@ func (o *Oauth) ToBind(c *gin.Context) {
 
 	service.AllService.OauthService.SetOauthCache(state, &service.OauthCacheItem{
 		Action:   service.OauthActionTypeBind,
-		Op:       f.Op,
+		Op:       op,
 		UserId:   u.Id,
 		Verifier: verifier,
 		Nonce:    nonce,
@@ -100,9 +107,29 @@ func (o *Oauth) BindConfirm(c *gin.Context) {
 		response.Fail(c, 101, response.TranslateMsg(c, "OauthExpired"))
 		return
 	}
-	oauthUser := oauthCache.ToOauthUser()
 	user := service.AllService.UserService.CurUser(c)
-	err = oauthService.BindOauthUser(user.Id, oauthUser, oauthCache.Op)
+	if user == nil || user.Id == 0 {
+		response.Fail(c, 101, response.TranslateMsg(c, "NeedLogin"))
+		return
+	}
+	// Only a pending bind started by the current user may be confirmed. A
+	// forged or foreign cache entry must never write a binding.
+	if oauthCache.Action != service.OauthActionTypeBind || oauthCache.UserId != user.Id {
+		response.Fail(c, 101, response.TranslateMsg(c, "OauthExpired"))
+		return
+	}
+	if oauthCache.OpenId == "" {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
+	op := service.NormalizeOp(oauthCache.Op)
+	if utr := oauthService.UserThirdInfo(op, oauthCache.OpenId); utr.Id > 0 {
+		response.Fail(c, 101, response.TranslateMsg(c, "OauthHasBindOtherUser"))
+		return
+	}
+
+	oauthUser := oauthCache.ToOauthUser()
+	err = oauthService.BindOauthUser(user.Id, oauthUser, op)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "BindFail"))
 		return
@@ -121,12 +148,17 @@ func (o *Oauth) Unbind(c *gin.Context) {
 		return
 	}
 	u := service.AllService.UserService.CurUser(c)
-	utr := service.AllService.UserService.UserThirdInfo(u.Id, f.Op)
+	if u == nil || u.Id == 0 {
+		response.Fail(c, 101, response.TranslateMsg(c, "NeedLogin"))
+		return
+	}
+	op := service.NormalizeOp(f.Op)
+	utr := service.AllService.UserService.UserThirdInfo(u.Id, op)
 	if utr.Id == 0 {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return
 	}
-	err = service.AllService.OauthService.UnBindOauthUser(u.Id, f.Op)
+	err = service.AllService.OauthService.UnBindOauthUser(u.Id, op)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
 		return

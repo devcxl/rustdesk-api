@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/lejianwen/rustdesk-api/v2/config"
+	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/sirupsen/logrus"
 )
 
@@ -173,5 +174,42 @@ func TestInvalidProxyErrorRedactsCredentials(t *testing.T) {
 	_ = getHTTPClientWithProxy()
 	if strings.Contains(output.String(), "DUMMY-PASSWORD") || strings.Contains(output.String(), "demo:") {
 		t.Fatalf("log leaks proxy credentials: %q", output.String())
+	}
+}
+
+func TestNormalizeOpCollapsesVariantsToGithub(t *testing.T) {
+	for _, op := range []string{"", "github", "GITHUB", "GitHub", " github ", "webauth", "oidc", "gitee", "unknown-provider"} {
+		if got := NormalizeOp(op); got != model.OauthTypeGithub {
+			t.Errorf("NormalizeOp(%q) = %q, want %q", op, got, model.OauthTypeGithub)
+		}
+	}
+}
+
+func TestClearUnverifiedEmailDropsPublicProfileAddress(t *testing.T) {
+	// /user exposes a public profile email that is not necessarily verified.
+	user := &model.GithubUser{
+		OauthUserBase: model.OauthUserBase{Email: "public@example.com"},
+		VerifiedEmail: false,
+	}
+	clearUnverifiedEmail(user)
+	if user.Email != "" {
+		t.Fatalf("unverified email must be cleared, got %q", user.Email)
+	}
+	if ou := user.ToOauthUser(); ou.Email != "" {
+		t.Fatalf("unverified email must not reach OauthUser, got %q", ou.Email)
+	}
+}
+
+func TestClearUnverifiedEmailKeepsVerifiedPrimaryAddress(t *testing.T) {
+	user := &model.GithubUser{
+		OauthUserBase: model.OauthUserBase{Email: "primary@example.com"},
+		VerifiedEmail: true,
+	}
+	clearUnverifiedEmail(user)
+	if user.Email != "primary@example.com" {
+		t.Fatalf("verified primary email must be kept, got %q", user.Email)
+	}
+	if ou := user.ToOauthUser(); ou.Email != "primary@example.com" || !ou.VerifiedEmail {
+		t.Fatalf("verified email lost in conversion: %+v", ou)
 	}
 }

@@ -114,7 +114,7 @@ POST /api/oidc/device/auth
   resp {device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval}
 POST /api/oidc/device/token
   req  {device_code}
-  resp 200 {access_token, token_type: "access_token", user}
+  resp 200 {access_token, type: "access_token", user}
        400 {error: "authorization_pending" | "slow_down" | "expired_token" | "access_denied" | "invalid_grant"}
 GET  /api/admin/oidc/device/pending?user_code=...   # api-token
 POST /api/admin/oidc/device/approve                 # api-token
@@ -154,7 +154,7 @@ POST /api/admin/oidc/device/approve                 # api-token
 
 1. device grant 未批准时轮询返回 `authorization_pending`；批准后首次轮询返回 token，第二次返回 `invalid_grant`。
 2. 只持有 `user_code`、没有 admin token 的第三方无法调用 pending/approve（401/403），也无法取得 token。
-3. 只持有 legacy `state` 的第三方在 Phase 1 确认机制下无法兑换（`auth-query` 失败）。
+3. 只持有 legacy `state` 的第三方，在 Owner 未确认时无法兑换（`auth-query` 不返回 token）；确认后仍可兑换，说明 Phase 1 只是过渡缓解，不能替代 A。
 4. deny、过期、缓存满分别返回 `access_denied`、`expired_token`、`temporarily_unavailable`。
 5. 超过限流与快于 `interval` 的轮询分别返回 429 与 `slow_down`。
 6. 管理台绑定 cookie：缺失/不匹配时回调拒绝；匹配时成功。

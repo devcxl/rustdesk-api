@@ -1,8 +1,6 @@
 module github.com/lejianwen/rustdesk-api/v2
 
-go 1.23
-
-toolchain go1.23.10
+go 1.24.0
 
 require (
 	github.com/BurntSushi/toml v1.3.2
@@ -41,7 +39,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
 	github.com/go-openapi/spec v0.20.4 // indirect

@@ -24,15 +24,22 @@ export default function App() {
   const token = getToken()
   const isLoginRoute = currentHash === '#/login' || currentHash.startsWith('#/oauth/callback')
 
-  // 路由拦截：未登录且不在登录/回调页
+  // 路由同步拦截处理
+  React.useEffect(() => {
+    if (!token && !isLoginRoute) {
+      window.location.hash = '#/login'
+    } else if (token && isLoginRoute) {
+      window.location.hash = '#/'
+    }
+  }, [token, isLoginRoute])
+
+  // 未登录且不在登录/回调页
   if (!token && !isLoginRoute) {
-    window.location.hash = '#/login'
     return <LoginPage />
   }
 
   // 已登录但仍在登录/回调页
   if (token && isLoginRoute) {
-    window.location.hash = '#/'
     return null
   }
 

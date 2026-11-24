@@ -98,12 +98,16 @@ export function LoginPage() {
 
     const callbackState = readCallbackState()
     if (callbackState) {
-      void finishLogin(callbackState)
+      queueMicrotask(() => {
+        void finishLogin(callbackState)
+      })
       return
     }
     if (canAutoRedirect()) {
       markAutoRedirect()
-      void startLogin()
+      queueMicrotask(() => {
+        void startLogin()
+      })
     }
   }, [finishLogin, startLogin])
 
@@ -113,46 +117,52 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md shadow-lg border-muted">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow">
-            <Server className="h-6 w-6" />
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6">
+      <Card className="w-full max-w-sm rounded-xl border bg-card shadow-xs">
+        <CardHeader className="text-center pb-4 pt-6 space-y-2">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+            <Server className="h-5 w-5" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">RustDesk API</CardTitle>
-          <CardDescription className="text-sm">
-            自托管管理控制面板
-          </CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-bold tracking-tight text-foreground">
+              RustDesk 控制面板
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              自托管单用户管理后台
+            </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+
+        <CardContent className="space-y-4 pt-2">
           {errorText && (
-            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive leading-relaxed">
               {errorText}
             </div>
           )}
 
           {statusText && (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               <span>{statusText}</span>
             </div>
           )}
 
           <Button
-            className="w-full h-11 text-base font-medium shadow"
+            className="w-full h-10 text-sm font-medium cursor-pointer"
             onClick={handleManualLogin}
             disabled={loading}
           >
             {loading ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <GithubIcon className="mr-2 h-5 w-5" />
+              <GithubIcon className="mr-2 h-4 w-4" />
             )}
             使用 GitHub 账号登录
           </Button>
         </CardContent>
-        <CardFooter className="justify-center border-t py-4 text-xs text-muted-foreground">
-          RustDesk Self-Hosted API Server
+
+        <CardFooter className="justify-center border-t py-3 text-[11px] text-muted-foreground">
+          RustDesk Self-Hosted Single User API Server
         </CardFooter>
       </Card>
     </div>

@@ -1,18 +1,16 @@
 import {
   ArrowRight,
   BookUser,
-  Check,
-  Copy,
   Laptop,
   Monitor,
   Radio,
   Server,
-  ShieldAlert,
+  ShieldCheck,
   Tags,
 } from 'lucide-react'
 import * as React from 'react'
-import { toast } from 'sonner'
 
+import { CopyButton, EmptyState, PageHeader, StatusBadge } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,6 +21,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { api } from '@/lib/api'
+import { formatRelativeTime } from '@/lib/format'
 import type { Peer, ServerConfig, User } from '@/types/api'
 
 export function DashboardPage() {
@@ -34,15 +33,14 @@ export function DashboardPage() {
   const [addressBookTotal, setAddressBookTotal] = React.useState(0)
   const [tagTotal, setTagTotal] = React.useState(0)
   const [recentPeers, setRecentPeers] = React.useState<Peer[]>([])
-  const [copiedKey, setCopiedKey] = React.useState<string | null>(null)
+  const [nowUnix, setNowUnix] = React.useState(() => Math.floor(Date.now() / 1000))
 
-  React.useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
     try {
       setLoading(true)
+      const currentNow = Math.floor(Date.now() / 1000)
+      setNowUnix(currentNow)
+
       const [u, cfg, peersRes, abRes, tagRes] = await Promise.all([
         api.user.getCurrent().catch(() => null),
         api.config.getServer().catch(() => null),
@@ -56,10 +54,9 @@ export function DashboardPage() {
       if (peersRes) {
         setPeerTotal(peersRes.total || 0)
         setRecentPeers(peersRes.list || [])
-        const now = Math.floor(Date.now() / 1000)
         // 5分钟内有心跳视为在线
         const online = (peersRes.list || []).filter(
-          (p) => now - p.last_online_time < 300
+          (p) => currentNow - p.last_online_time < 300
         ).length
         setOnlineCount(online)
       }
@@ -68,252 +65,337 @@ export function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text)
-    setCopiedKey(label)
-    toast.success(`已复制 ${label} 到剪贴板`)
-    setTimeout(() => setCopiedKey(null), 2000)
-  }
+  React.useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   // 生成客户端简易配置字符串
   const clientConfigString = config
     ? `host=${config.id_server},key=${config.key}`
     : ''
 
+  const apiServerAddress = config?.api_server || window.location.origin
+
   return (
-    <div className="space-y-8">
-      {/* 顶部欢迎区 */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">控制台概览</h1>
-          <p className="text-sm text-muted-foreground">
-            欢迎回来，系统唯一 Owner <span className="font-semibold text-foreground">{user?.username}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => (window.location.hash = '#/address-book')}>
-            <BookUser className="mr-2 h-4 w-4" />
-            新建地址簿条目
-          </Button>
-          <Button size="sm" onClick={() => (window.location.hash = '#/peers')}>
-            <Monitor className="mr-2 h-4 w-4" />
-            受控设备管理
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* 顶部标题区 */}
+      <PageHeader
+        title="控制台概览"
+        description={
+          <span>
+            欢迎回来，系统唯一管理员{' '}
+            <span className="font-semibold text-foreground">
+              {user?.username || 'Owner'}
+            </span>
+          </span>
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => (window.location.hash = '#/address-book')}
+              className="gap-1.5 cursor-pointer"
+            >
+              <BookUser className="h-4 w-4" />
+              <span>新建地址簿条目</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => (window.location.hash = '#/peers')}
+              className="gap-1.5 cursor-pointer"
+            >
+              <Monitor className="h-4 w-4" />
+              <span>受控设备管理</span>
+            </Button>
+          </>
+        }
+      />
 
       {/* 统计指标卡片 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-sm">
+        {/* 受控设备 */}
+        <Card className="shadow-xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">受控设备总数</CardTitle>
-            <Monitor className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              受控设备总数
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
+              <Monitor className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? '-' : peerTotal}</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>当前活跃约 {onlineCount} 台</span>
-            </p>
+            <div className="text-2xl font-bold font-mono tracking-tight text-foreground">
+              {loading ? '-' : peerTotal}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>活跃约 {onlineCount} 台</span>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        {/* 地址簿条目 */}
+        <Card className="shadow-xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">地址簿同步条目</CardTitle>
-            <BookUser className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              地址簿同步条目
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
+              <BookUser className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? '-' : addressBookTotal}</div>
-            <p className="text-xs text-muted-foreground mt-1">云端双向同步记录</p>
+            <div className="text-2xl font-bold font-mono tracking-tight text-foreground">
+              {loading ? '-' : addressBookTotal}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">云端双向同步记录</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        {/* 分组标签 */}
+        <Card className="shadow-xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">设备分组标签</CardTitle>
-            <Tags className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              设备分组标签
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
+              <Tags className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? '-' : tagTotal}</div>
-            <p className="text-xs text-muted-foreground mt-1">色彩分类与筛选维度</p>
+            <div className="text-2xl font-bold font-mono tracking-tight text-foreground">
+              {loading ? '-' : tagTotal}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">色彩分类与筛选维度</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        {/* 访问安全模式 */}
+        <Card className="shadow-xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">系统模式</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              系统运行模式
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border bg-muted/40 text-emerald-600 dark:text-emerald-400">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">Single User</div>
-            <p className="text-xs text-muted-foreground mt-1">仅允许授权 GitHub 账号</p>
+            <div className="text-2xl font-bold tracking-tight text-foreground">
+              Single User
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">白名单 OAuth 隔离受控</p>
           </CardContent>
         </Card>
       </div>
 
       {/* 服务端连接配置卡片 */}
-      <Card className="shadow-sm">
-        <CardHeader>
+      <Card className="shadow-xs">
+        <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
-            <Server className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">RustDesk 服务端参数</CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border bg-muted/40 text-foreground">
+              <Server className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold">RustDesk 服务端参数</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                将以下服务地址与公钥填入客户端网络设置中，或直接使用一键配置字符串
+              </CardDescription>
+            </div>
           </div>
-          <CardDescription>
-            将以下服务器与公钥配置填入 RustDesk 客户端的网络设置中，或直接使用一键配置字符串
-          </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border bg-muted/30 p-3.5 space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">ID 服务器 (ID Server)</span>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm font-semibold">{config?.id_server || '未配置'}</span>
+          {/* 服务器地址三个维度 */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-card p-3.5 space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                ID 服务器 (ID Server)
+              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-sm font-semibold truncate" title={config?.id_server || '未配置'}>
+                  {config?.id_server || '未配置'}
+                </span>
                 {config?.id_server && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                  <CopyButton
+                    text={config.id_server}
+                    label="ID Server"
                     className="h-7 w-7"
-                    onClick={() => copyToClipboard(config.id_server, 'ID Server')}
-                  >
-                    {copiedKey === 'ID Server' ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                  </Button>
+                  />
                 )}
               </div>
             </div>
 
-            <div className="rounded-lg border bg-muted/30 p-3.5 space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">中继服务器 (Relay Server)</span>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm font-semibold">{config?.relay_server || '未配置'}</span>
+            <div className="rounded-lg border bg-card p-3.5 space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                中继服务器 (Relay Server)
+              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-sm font-semibold truncate" title={config?.relay_server || '未配置'}>
+                  {config?.relay_server || '未配置'}
+                </span>
                 {config?.relay_server && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                  <CopyButton
+                    text={config.relay_server}
+                    label="Relay Server"
                     className="h-7 w-7"
-                    onClick={() => copyToClipboard(config.relay_server, 'Relay Server')}
-                  >
-                    {copiedKey === 'Relay Server' ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                  </Button>
+                  />
                 )}
               </div>
             </div>
 
-            <div className="rounded-lg border bg-muted/30 p-3.5 space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">API 服务器 (API Server)</span>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm font-semibold">{config?.api_server || window.location.origin}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
+            <div className="rounded-lg border bg-card p-3.5 space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                API 服务器 (API Server)
+              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-sm font-semibold truncate" title={apiServerAddress}>
+                  {apiServerAddress}
+                </span>
+                <CopyButton
+                  text={apiServerAddress}
+                  label="API Server"
                   className="h-7 w-7"
-                  onClick={() => copyToClipboard(config?.api_server || window.location.origin, 'API Server')}
-                >
-                  {copiedKey === 'API Server' ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                </Button>
+                />
               </div>
             </div>
           </div>
 
           {/* 公钥 Key */}
           {config?.key && (
-            <div className="rounded-lg border bg-muted/20 p-3.5 space-y-1.5">
+            <div className="rounded-lg border bg-muted/30 p-3.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">公钥 (Key)</span>
-                <Button
-                  variant="ghost"
+                <span className="text-xs font-medium text-muted-foreground">
+                  服务端公钥 (Key)
+                </span>
+                <CopyButton
+                  text={config.key}
+                  label="公钥 Key"
+                  showText
                   size="sm"
-                  className="h-6 text-xs gap-1"
-                  onClick={() => copyToClipboard(config.key, 'Key')}
-                >
-                  {copiedKey === 'Key' ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                  复制公钥
-                </Button>
+                  className="h-7 text-xs px-2"
+                />
               </div>
-              <p className="font-mono text-xs text-muted-foreground break-all">{config.key}</p>
+              <p className="font-mono text-xs text-muted-foreground break-all select-all rounded bg-background/60 border p-2">
+                {config.key}
+              </p>
             </div>
           )}
 
           {/* 客户端一键配置代码 */}
           {clientConfigString && (
-            <div className="flex items-center justify-between rounded-lg border bg-primary/5 p-3.5 text-sm">
-              <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-xs font-medium text-muted-foreground">客户端简易配置字符串：</span>
-                <code className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold">{clientConfigString}</code>
+            <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-1.5 min-w-0 sm:flex-row sm:items-center sm:gap-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground shrink-0">
+                  <Radio className="h-4 w-4 text-primary shrink-0" />
+                  <span>客户端简易配置字符串：</span>
+                </div>
+                <code className="rounded border bg-background px-2 py-1 font-mono text-xs font-medium break-all select-all text-foreground">
+                  {clientConfigString}
+                </code>
               </div>
-              <Button
+              <CopyButton
+                text={clientConfigString}
+                label="一键配置字符串"
+                showText
                 size="sm"
                 variant="outline"
-                className="h-8 gap-1 text-xs"
-                onClick={() => copyToClipboard(clientConfigString, '配置字符串')}
-              >
-                {copiedKey === '配置字符串' ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                复制字符串
-              </Button>
+                className="h-8 text-xs shrink-0 self-start sm:self-auto"
+              />
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* 最近设备列表 */}
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="shadow-xs">
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
           <div>
-            <CardTitle className="text-lg">近期活跃设备</CardTitle>
-            <CardDescription>受控端心跳连入的设备记录</CardDescription>
+            <CardTitle className="text-base font-semibold">近期活跃设备</CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              受控端向此服务器上报心跳的最新记录
+            </CardDescription>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => (window.location.hash = '#/peers')}>
-            查看全部 <ArrowRight className="ml-1 h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => (window.location.hash = '#/peers')}
+            className="text-xs gap-1 cursor-pointer"
+          >
+            <span>查看全部</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </CardHeader>
         <CardContent>
           {recentPeers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
-              <Laptop className="h-8 w-8 mb-2 opacity-40" />
-              <p>暂无连入的受控设备</p>
-              <p className="text-xs mt-1">在客户端输入上述配置参数后，设备将自动注册至此</p>
-            </div>
+            <EmptyState
+              icon={Laptop}
+              title="暂无连入的受控设备"
+              description="在客户端填入上述服务器配置参数后，设备将自动注册至此"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => (window.location.hash = '#/settings')}
+                  className="text-xs"
+                >
+                  查看客户端配置指南
+                </Button>
+              }
+            />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {recentPeers.map((peer) => {
-                const now = Math.floor(Date.now() / 1000)
-                const isOnline = now - peer.last_online_time < 300
+                const isOnline = nowUnix - peer.last_online_time < 300
+                const displayName = peer.alias || peer.hostname || peer.id
                 return (
                   <div
                     key={peer.row_id}
-                    className="flex items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/40 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border bg-card p-3 text-sm hover:bg-muted/30 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground shrink-0">
                         <Monitor className="h-4 w-4" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{peer.alias || peer.hostname || peer.id}</span>
-                          <Badge variant={isOnline ? 'success' : 'secondary'} className="text-[10px]">
-                            {isOnline ? '在线' : '离线'}
-                          </Badge>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-foreground truncate" title={displayName}>
+                            {displayName}
+                          </span>
+                          <StatusBadge online={isOnline} />
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mt-0.5">
-                          <span>ID: {peer.id}</span>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mt-0.5 flex-wrap">
+                          <span title={peer.id}>ID: {peer.id}</span>
                           <span>•</span>
-                          <span>{peer.os || 'Unknown OS'}</span>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                            {peer.os || 'Unknown OS'}
+                          </Badge>
                           <span>•</span>
                           <span>{peer.last_online_ip || '未知IP'}</span>
+                          <span>•</span>
+                          <span>{formatRelativeTime(peer.last_online_time, nowUnix)}</span>
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => (window.location.hash = '#/peers')}
-                    >
-                      详情
-                    </Button>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <CopyButton
+                        text={peer.id}
+                        label="设备 ID"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs cursor-pointer"
+                        onClick={() => (window.location.hash = '#/peers')}
+                      >
+                        设备管理
+                      </Button>
+                    </div>
                   </div>
                 )
               })}

@@ -16,7 +16,7 @@
 | 7 | OAuth state 未绑定轮询客户端 | 设计提案（待决策） | GitHub 授权/自动批准行为、产品决策 |
 | 8 | 管理台缺少防框架头（clickjacking） | 已修复 | 反代是否覆盖/补充响应头 |
 | 9 | 发布工作流对可变第三方引用授予写权限 | 代码已修复；托管设置待开 | GitHub 仓库 tag/environment 保护、Dependabot alerts |
-| 10 | 构建工具链/基础镜像未固定摘要 | 未修复 | 工具链分发方与镜像发布方的可信度 |
+| 10 | 构建工具链/基础镜像未固定摘要 | 已修复（TOFU） | 后续通过 Dependabot 更新 digest |
 
 ## 逐项说明与核实方式
 
@@ -67,9 +67,8 @@
 - 通过标准：所有 `uses:` 为 40 位 SHA；发布 job 需要受保护 ref/环境；token 权限与 job 匹配。
 
 ### 10. 构建工具链/基础镜像摘要
-- 未修复：musl 工具链仍按 URL 下载且无校验；基础镜像使用浮动 tag。跟踪：<https://github.com/devcxl/rustdesk-api/issues/31>
-- 核实：`musl.ljw.red` 是否为 Owner 控制；镜像 tag 的发布方可信度。
-- 通过标准：工具链与基础镜像均以 SHA-256/digest 固定并在构建时校验。
+- 已修复：基础镜像固定到 multi-arch manifest list digest；两个 musl 工具链包在解压前校验 SHA-256，不匹配即中止（首次记录为 trust-on-first-use）。跟踪：<https://github.com/devcxl/rustdesk-api/issues/31>
+- 后续：通过 Dependabot 的 docker 生态更新 digest，工具链升级需人工复核后同步哈希。
 
 ## 其他跟踪事项（非 needs-validation）
 
@@ -86,9 +85,9 @@
 待处理：
 
 - #29 OAuth state 绑定（已有 ADR，待决策）。
-- #30 托管侧 Dependabot/tag 保护设置（代码已固定 SHA）。
-- #31 工具链/基础镜像摘要固定（需可信摘要来源）。
-- #39 遗留 `user_thirds` op 迁移与唯一约束。
+- #30 托管侧 tag/environment 保护与 action 白名单（Dependabot alerts 与 security updates 已通过 API 开启，代码已固定 SHA）。
+- #31 已修复：镜像 digest 与工具链哈希固定（`cf01be6`）。
+- #39 已修复：启动时自动归一化/去重并建立唯一索引（`0c0fc2e`）。
 
 ## 复核命令
 

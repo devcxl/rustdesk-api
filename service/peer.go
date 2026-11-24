@@ -116,40 +116,44 @@ func (ps *PeerService) Create(u *model.Peer) error {
 
 // Delete 删除, 同时也应该删除token
 func (ps *PeerService) Delete(u *model.Peer) error {
-	uuid := u.Uuid
 	err := DB.Delete(u).Error
 	if err != nil {
 		return err
 	}
-	// 删除token
-	return AllService.UserService.FlushTokenByUuid(uuid)
+	// 删除token, 同时按 uuid 和 id 匹配
+	return AllService.UserService.FlushTokenByUuidAndDeviceId(u.Uuid, u.Id)
 }
 
-// GetUuidListByIDs 根据ids获取uuid列表
-func (ps *PeerService) GetUuidListByIDs(ids []uint) ([]string, error) {
-	var uuids []string
-	err := DB.Model(&model.Peer{}).
+// GetUuidAndIdListByIDs 根据ids获取uuid和设备id列表, 空值会被过滤
+func (ps *PeerService) GetUuidAndIdListByIDs(ids []uint) (uuids []string, deviceIds []string, err error) {
+	var peers []*model.Peer
+	err = DB.Model(&model.Peer{}).
+		Select("uuid", "id").
 		Where("row_id in (?)", ids).
-		Pluck("uuid", &uuids).Error
-	//过滤uuids中的空字符串
-	var newUuids []string
-	for _, uuid := range uuids {
-		if uuid != "" {
-			newUuids = append(newUuids, uuid)
+		Find(&peers).Error
+	for _, peer := range peers {
+		if peer.Uuid != "" {
+			uuids = append(uuids, peer.Uuid)
+		}
+		if peer.Id != "" {
+			deviceIds = append(deviceIds, peer.Id)
 		}
 	}
-	return newUuids, err
+	return
 }
 
 // BatchDelete 批量删除, 同时也应该删除token
 func (ps *PeerService) BatchDelete(ids []uint) error {
-	uuids, err := ps.GetUuidListByIDs(ids)
+	uuids, deviceIds, err := ps.GetUuidAndIdListByIDs(ids)
+	if err != nil {
+		return err
+	}
 	err = DB.Where("row_id in (?)", ids).Delete(&model.Peer{}).Error
 	if err != nil {
 		return err
 	}
-	// 删除token
-	return AllService.UserService.FlushTokenByUuids(uuids)
+	// 删除token, 同时按 uuid 和 id 匹配
+	return AllService.UserService.FlushTokenByUuidsAndDeviceIds(uuids, deviceIds)
 }
 
 // Update 更新

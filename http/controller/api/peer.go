@@ -30,6 +30,13 @@ func (p *Peer) SysInfo(c *gin.Context) {
 		response.Error(c, response.TranslateMsg(c, "ParamsError")+err.Error())
 		return
 	}
+	// Anonymous telemetry must not store multi-megabyte fields per peer row.
+	if len(f.Id) > 128 || len(f.Uuid) > 128 || len(f.Hostname) > 256 ||
+		len(f.Username) > 256 || len(f.Os) > 128 || len(f.Cpu) > 128 ||
+		len(f.Memory) > 128 || len(f.Version) > 64 {
+		response.Error(c, response.TranslateMsg(c, "ParamsError"))
+		return
+	}
 	fpe := f.ToPeer()
 	pe := service.AllService.PeerService.FindById(f.Id)
 	ownerId := service.AllService.UserService.GetOwnerId()
@@ -47,6 +54,11 @@ func (p *Peer) SysInfo(c *gin.Context) {
 		}
 		fpe.RowId = pe.RowId
 		fpe.UserId = pe.UserId
+		// uuid 是设备的撤销身份, 匿名上报不允许改写已存在的记录,
+		// 否则可通过伪造 uuid 绕过按 uuid 删除设备的 token 撤销。
+		if fpe.Uuid != pe.Uuid {
+			fpe.Uuid = pe.Uuid
+		}
 		err = service.AllService.PeerService.Update(fpe)
 		if err != nil {
 			response.Error(c, response.TranslateMsg(c, "OperationFailed")+err.Error())

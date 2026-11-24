@@ -178,6 +178,7 @@ func (us *UserService) Logout(u *model.User, token string) error {
 	if err != nil {
 		return err
 	}
+	// Webadmin tokens have no device uuid; an empty uuid must not unbind a peer row.
 	if uuid != "" {
 		AllService.PeerService.UuidUnbindUserId(uuid, u.Id)
 	}
@@ -199,9 +200,44 @@ func (us *UserService) FlushTokenByUuid(uuid string) error {
 	return DB.Where("device_uuid = ?", uuid).Delete(&model.UserToken{}).Error
 }
 
+// FlushTokenByUuidAndDeviceId 按设备 uuid 或设备 id 删除 token。
+// 空值会被跳过: 后台(webadmin) token 的 device_uuid 为空, 不能拿空 uuid 去匹配。
+func (us *UserService) FlushTokenByUuidAndDeviceId(uuid, deviceId string) error {
+	return us.FlushTokenByUuidsAndDeviceIds([]string{uuid}, []string{deviceId})
+}
+
+// FlushTokenByUuidsAndDeviceIds 用一条语句删除匹配任一设备 uuid 或设备 id 的 token。
+// 空值会被跳过。
+func (us *UserService) FlushTokenByUuidsAndDeviceIds(uuids []string, deviceIds []string) error {
+	conditions := make([]string, 0, 2)
+	args := make([]interface{}, 0, 2)
+	if values := nonEmptyStrings(uuids); len(values) > 0 {
+		conditions = append(conditions, "device_uuid in (?)")
+		args = append(args, values)
+	}
+	if values := nonEmptyStrings(deviceIds); len(values) > 0 {
+		conditions = append(conditions, "device_id in (?)")
+		args = append(args, values)
+	}
+	if len(conditions) == 0 {
+		return nil
+	}
+	return DB.Where(strings.Join(conditions, " OR "), args...).Delete(&model.UserToken{}).Error
+}
+
 // FlushTokenByUuids 清空一组设备的 token
 func (us *UserService) FlushTokenByUuids(uuids []string) error {
-	return DB.Where("device_uuid in (?)", uuids).Delete(&model.UserToken{}).Error
+	return us.FlushTokenByUuidsAndDeviceIds(uuids, nil)
+}
+
+func nonEmptyStrings(values []string) []string {
+	res := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != "" {
+			res = append(res, value)
+		}
+	}
+	return res
 }
 
 // UpdatePassword 更新密码

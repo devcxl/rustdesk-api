@@ -20,6 +20,8 @@ func Init(g *gin.Engine) {
 	ConfigBind(adg)
 
 	adg.Use(middleware.BackendUserAuth())
+	// 登出需要先通过鉴权, 否则无法拿到当前 token 并撤销
+	adg.POST("/logout", (&admin.Login{}).Logout)
 	UserBind(adg)
 	TagBind(adg)
 	AddressBookBind(adg)
@@ -29,7 +31,6 @@ func Init(g *gin.Engine) {
 
 func LoginBind(rg *gin.RouterGroup) {
 	cont := &admin.Login{}
-	rg.POST("/logout", cont.Logout)
 	rg.GET("/login-options", cont.LoginOptions)
 	rg.POST("/oidc/auth", cont.OidcAuth)
 	rg.GET("/oidc/auth-query", cont.OidcAuthQuery)

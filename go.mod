@@ -15,7 +15,7 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/nicksnyder/go-i18n/v2 v2.4.0
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.8.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.9.0
 	github.com/swaggo/files v1.0.1

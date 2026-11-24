@@ -11,6 +11,10 @@ docker-dev.sh
 .env*
 **/id_ed25519*
 
+# Ignore local configuration: conf/config.yaml may hold OAuth/JWT/RustDesk
+# secrets. The dev image expects conf/ to be mounted at runtime.
+conf/
+
 # Ignore the data directory
 data/
 

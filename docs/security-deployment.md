@@ -121,3 +121,11 @@ sudo chmod 0640 /var/lib/rustdesk-api/conf/config.yaml
 - 匿名敏感路径有按 IP 的每分钟固定窗口预算：OIDC 发起 30、OIDC 轮询 120、OAuth/OIDC 回调 60、`/api/sysinfo` 300、`/api/heartbeat` 6000，其余 3000；超限返回 429。多实例部署时每实例独立计数。
 - 反向代理的 `client_max_body_size` 建议不小于 8 MiB，并配置连接/读取超时，避免把无超时连接直接暴露给进程。
 - `gin.trust-proxy` 必须与实际反代地址一致，否则按 IP 的限流与日志会记录代理地址。
+
+## 9. 开发镜像、conf 挂载与测试密钥
+
+- `.dockerignore` 已排除 `conf/`（与既有 `.env*`、`runtime/`、数据库及 `id_ed25519*` 规则并列），`Dockerfile.dev` 的构建上下文与最终镜像都不再包含本地 `conf/config.yaml`，避免把本地 OAuth/JWT/RustDesk 密钥打进开发镜像。
+- 开发镜像运行时必须挂载配置目录：`docker-compose-dev.yaml` 已提供 `./conf:/app/conf`，请保持该挂载。缺少 `conf/config.yaml` 时进程会在启动时 panic（`Fatal error config file`）。
+- 不要在不挂载 `conf/` 的情况下直接用 `docker run` 启动开发镜像；如确需单独运行，请显式挂载配置目录（`-v "$PWD/conf:/app/conf"`），并确保该目录包含 `config.yaml`。
+- 发布镜像不受影响：发布流程由 `build.sh` 将 `conf/` 放入 `release/`，再由仓库根 `Dockerfile` 复制构建产物；`.dockerignore` 中的 `conf/` 只匹配构建上下文根目录，不会排除 `amd64/release/conf` 等嵌套路径。
+- `lib/jwt` 测试使用源码中明确标注的非生产 HMAC 测试密钥，不得作为部署 `jwt.key`；仓库已移除历史 RSA 测试私钥，但旧提交中的密钥材料仍应视为已泄露、不可复用，如曾用于部署请轮换 `jwt.key`。

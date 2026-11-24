@@ -59,9 +59,11 @@ RUN if [ "$COUNTRY" = "CN" ] ; then \
     fi && \
     apk update && apk add --no-cache tzdata file
 
-# Copy the built application and resources from the builder stage
+# Copy the built application and resources from the builder stage.
+# conf/ is intentionally not copied: it may contain local JWT/OAuth/RustDesk
+# secrets. Mount it at runtime instead, e.g. ./conf:/app/conf (see
+# docker-compose-dev.yaml).
 COPY --from=builder-backend /app/release /app/
-COPY --from=builder-backend /app/conf /app/conf/
 COPY --from=builder-backend /app/resources /app/resources/
 COPY --from=builder-backend /app/docs /app/docs/
 # Copy the generated admin frontend from its build stage.

@@ -129,3 +129,12 @@ sudo chmod 0640 /var/lib/rustdesk-api/conf/config.yaml
 - 不要在不挂载 `conf/` 的情况下直接用 `docker run` 启动开发镜像；如确需单独运行，请显式挂载配置目录（`-v "$PWD/conf:/app/conf"`），并确保该目录包含 `config.yaml`。
 - 发布镜像不受影响：发布流程由 `build.sh` 将 `conf/` 放入 `release/`，再由仓库根 `Dockerfile` 复制构建产物；`.dockerignore` 中的 `conf/` 只匹配构建上下文根目录，不会排除 `amd64/release/conf` 等嵌套路径。
 - `lib/jwt` 测试使用源码中明确标注的非生产 HMAC 测试密钥，不得作为部署 `jwt.key`；仓库已移除历史 RSA 测试私钥，但旧提交中的密钥材料仍应视为已泄露、不可复用，如曾用于部署请轮换 `jwt.key`。
+
+## 10. 构建输入固定（镜像 digest 与工具链哈希）
+
+- `Dockerfile`、`Dockerfile.dev`、`Dockerfile_full_s6` 的基础镜像全部固定到 multi-arch manifest list digest（形如 `IMAGE:TAG@sha256:...`，2026-11-25 解析）。更新应通过 Dependabot 的 docker 生态系统提 PR，或显式刷新 digest；不要改回浮动 tag。
+- 核对镜像 digest：`docker buildx imagetools inspect alpine:latest`（比对 `Digest:` 行），或对已构建镜像执行 `docker inspect --format '{{index .RepoDigests 0}}' <镜像>`。
+- 发布构建 `.github/scripts/build-apimain.sh` 在解压前校验两个 musl 交叉工具链包，哈希不匹配立即中止构建（2026-11-25 首次记录，trust-on-first-use）：
+  - `aarch64-linux-musl-cross.tgz`：`c909817856d6ceda86aa510894fa3527eac7989f0ef6e87b5721c58737a06c38`
+  - `armv7l-linux-musleabihf-cross.tgz`：`f49f1a15ec62364ef5e4edb4e3990c0e1d2d1a54c90153b8f3869dad63328a10`
+- 升级工具链时需人工下载并复核压缩包内容，再同步修改脚本中的哈希常量与注释日期；不要仅凭下载结果直接替换哈希。

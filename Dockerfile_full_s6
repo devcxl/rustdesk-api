@@ -1,6 +1,9 @@
-FROM rustdesk/rustdesk-server-s6:latest AS server
+# Base images are pinned to multi-arch manifest-list digests (resolved 2026-11-25).
+# Refresh via Dependabot's docker ecosystem, or re-resolve explicitly:
+#   docker buildx imagetools inspect rustdesk/rustdesk-server-s6:latest
+FROM rustdesk/rustdesk-server-s6:latest@sha256:5974cd791a5aca6fbf01a167b37e7427db1d136e95b2710c33a34fdc9fea724c AS server
 
-FROM alpine
+FROM alpine:latest@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 ARG BUILDARCH
 WORKDIR /app

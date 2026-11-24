@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Pinned musl cross-toolchain archives (trust-on-first-use, hashes verified
+# 2026-11-25 against https://musl.ljw.red/). Release builds must verify the
+# archive before extraction; a mismatch aborts the build. To refresh, download
+# the archive, review it, then update the hash and the date above deliberately.
+readonly AARCH64_MUSL_CROSS_SHA256="c909817856d6ceda86aa510894fa3527eac7989f0ef6e87b5721c58737a06c38"
+readonly ARMV7L_MUSL_CROSS_SHA256="f49f1a15ec62364ef5e4edb4e3990c0e1d2d1a54c90153b8f3869dad63328a10"
+
 target_goos="${TARGET_GOOS:?TARGET_GOOS is required}"
 target_platform="${TARGET_PLATFORM:?TARGET_PLATFORM is required}"
 archive_extension="${ARCHIVE_EXTENSION:?ARCHIVE_EXTENSION is required}"
@@ -31,6 +38,7 @@ if [[ "$target_goos" == windows ]]; then
   zip -r "$archive" ./release
 elif [[ "$target_platform" == arm64 ]]; then
   wget https://musl.ljw.red/aarch64-linux-musl-cross.tgz
+  printf '%s  %s\n' "$AARCH64_MUSL_CROSS_SHA256" aarch64-linux-musl-cross.tgz | sha256sum --strict --check -
   tar -xf aarch64-linux-musl-cross.tgz
   export PATH="$PATH:$PWD/aarch64-linux-musl-cross/bin"
   GOOS="$target_goos" GOARCH="$target_platform" \
@@ -39,6 +47,7 @@ elif [[ "$target_platform" == arm64 ]]; then
   tar -czf "$archive" ./release
 elif [[ "$target_platform" == armv7l ]]; then
   wget https://musl.ljw.red/armv7l-linux-musleabihf-cross.tgz
+  printf '%s  %s\n' "$ARMV7L_MUSL_CROSS_SHA256" armv7l-linux-musleabihf-cross.tgz | sha256sum --strict --check -
   tar -xf armv7l-linux-musleabihf-cross.tgz
   export PATH="$PATH:$PWD/armv7l-linux-musleabihf-cross/bin"
   GOOS="$target_goos" GOARCH=arm GOARM=7 \

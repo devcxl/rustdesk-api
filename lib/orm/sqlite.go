@@ -5,16 +5,68 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
+const defaultSqliteDsn = "./data/rustdeskapi.db"
+
 type SqliteConfig struct {
+	Dsn          string
 	MaxIdleConns int
 	MaxOpenConns int
 }
 
+// sqliteFilePath 从 DSN 中提取数据库文件路径。
+func sqliteFilePath(dsn string) string {
+	p := strings.TrimPrefix(dsn, "file:")
+	if i := strings.IndexByte(p, '?'); i >= 0 {
+		p = p[:i]
+	}
+	return p
+}
+
+// isMemoryDsn 判断是否为内存数据库，内存 DSN 不做文件权限处理。
+func isMemoryDsn(dsn string) bool {
+	if strings.Contains(dsn, "mode=memory") {
+		return true
+	}
+	p := sqliteFilePath(dsn)
+	return p == "" || p == ":memory:"
+}
+
+// hardenSqliteFiles 在打开数据库前收窄文件权限，避免数据库及 WAL/日志文件被其他用户读取。
+func hardenSqliteFiles(dsn string) {
+	if isMemoryDsn(dsn) {
+		return
+	}
+	path := sqliteFilePath(dsn)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		fmt.Println("create sqlite data dir fail:", err)
+		return
+	}
+	if dir != "." {
+		if err := os.Chmod(dir, 0700); err != nil {
+			fmt.Println("chmod sqlite data dir fail:", err)
+		}
+	}
+	if _, err := os.Stat(path); err == nil {
+		if err := os.Chmod(path, 0600); err != nil {
+			fmt.Println("chmod sqlite db file fail:", err)
+		}
+	}
+}
+
 func NewSqlite(sqliteConf *SqliteConfig, logwriter logger.Writer) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open("./data/rustdeskapi.db"), &gorm.Config{
+	dsn := sqliteConf.Dsn
+	if dsn == "" {
+		dsn = defaultSqliteDsn
+	}
+	hardenSqliteFiles(dsn)
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 		Logger: logger.New(
 			logwriter, // io writer

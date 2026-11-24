@@ -3,11 +3,18 @@ Description=Rustdesk api Server
 
 [Service]
 Type=simple
-LimitNOFILE=1000000
+User=rustdesk-api
+Group=rustdesk-api
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/rustdesk-api/data /var/lib/rustdesk-api/runtime /var/log/rustdesk-api
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=65535
 ExecStart=/usr/bin/rustdesk-api
 WorkingDirectory=/var/lib/rustdesk-api/
-User=
-Group=
 Restart=always
 StandardOutput=append:/var/log/rustdesk-api/rustdesk-api.log
 StandardError=append:/var/log/rustdesk-api/rustdesk-api.error

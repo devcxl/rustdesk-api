@@ -2,9 +2,29 @@
 set -e
 
 SERVICE=rustdesk-api.service
+DATA_DIR=/var/lib/rustdesk-api
+LOG_DIR=/var/log/rustdesk-api
+RUN_USER=rustdesk-api
 
 if [ "$1" = "configure" ]; then
-    mkdir -p /var/log/rustdesk-api
+    # Dedicated system account; the service must not run as root.
+    if ! getent group "${RUN_USER}" >/dev/null; then
+        addgroup --system "${RUN_USER}"
+    fi
+    if ! getent passwd "${RUN_USER}" >/dev/null; then
+        adduser --system --ingroup "${RUN_USER}" --home "${DATA_DIR}" \
+            --no-create-home --disabled-login "${RUN_USER}"
+    fi
+
+    mkdir -p "${DATA_DIR}/data" "${DATA_DIR}/runtime" "${LOG_DIR}"
+    chown -R "${RUN_USER}:${RUN_USER}" "${DATA_DIR}/data" "${DATA_DIR}/runtime" "${LOG_DIR}"
+    chmod 0750 "${DATA_DIR}/data" "${DATA_DIR}/runtime" "${LOG_DIR}"
+
+    # The config may hold the RustDesk key, JWT key and OAuth secrets.
+    if [ -f "${DATA_DIR}/conf/config.yaml" ]; then
+        chown root:"${RUN_USER}" "${DATA_DIR}/conf/config.yaml"
+        chmod 0640 "${DATA_DIR}/conf/config.yaml"
+    fi
 fi
 
 case "$1" in

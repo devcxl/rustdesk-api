@@ -5,6 +5,18 @@ runtime/*
 release
 data/rustdeskapi.db
 
+# Local environment overrides and secrets
+.env
+.env.*
+id_ed25519*
+
+# Docker Compose database volume (./data/rustdesk/api)
+data/rustdesk/api/
+
+# Uploaded files; keep the directory placeholder
+resources/public/upload/*
+!resources/public/upload/.gitkeep
+
 # Frontend
 admin/node_modules
 admin/dist

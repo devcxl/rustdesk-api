@@ -1,15 +1,20 @@
 package logger
 
 import (
+	"fmt"
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 const (
 	DebugMode   = "debug"
 	ReleaseMode = "release"
+
+	logDirPerm  = os.FileMode(0750)
+	logFilePerm = os.FileMode(0640)
 )
 
 type Config struct {
@@ -31,9 +36,23 @@ func New(c *Config) *log.Logger {
 	f := c.Path
 	var write io.Writer
 	if f != "" {
-		fwriter, err := os.OpenFile(f, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		// 日志可能包含敏感信息，目录与文件权限收窄到仅服务账号可读写。
+		dir := filepath.Dir(f)
+		if err := os.MkdirAll(dir, logDirPerm); err != nil {
+			panic("create log directory fail: " + err.Error())
+		}
+		if dir != "." {
+			if err := os.Chmod(dir, logDirPerm); err != nil {
+				fmt.Fprintln(os.Stderr, "chmod log directory fail:", err)
+			}
+		}
+		fwriter, err := os.OpenFile(f, os.O_WRONLY|os.O_CREATE|os.O_APPEND, logFilePerm)
 		if err != nil {
 			panic("open log file fail!")
+		}
+		// 兼容历史版本以 0644 创建的文件。
+		if err := fwriter.Chmod(logFilePerm); err != nil {
+			fmt.Fprintln(os.Stderr, "chmod log file fail:", err)
 		}
 		write = io.MultiWriter(fwriter, os.Stdout)
 	} else {
@@ -46,7 +65,7 @@ func New(c *Config) *log.Logger {
 
 	level, err2 := log.ParseLevel(c.Level)
 	if err2 != nil {
-		level = log.DebugLevel
+		level = log.InfoLevel
 	}
 	log.SetLevel(level)
 

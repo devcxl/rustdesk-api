@@ -7,8 +7,17 @@ Dockerfile
 Dockerfile.dev
 docker-dev.sh
 
+# Ignore local environment overrides and secrets
+.env*
+**/id_ed25519*
+
 # Ignore the data directory
 data/
+
+# Ignore runtime state and local databases
+runtime/
+**/*.db
+**/*.sqlite
 
 # Ignore version control system directories
 .git/

@@ -47,7 +47,7 @@ echo "Building admin frontend..."
 (cd admin && pnpm install --frozen-lockfile && pnpm build)
 
 # Compile the Go code and output it to the release directory
-go build -o release/apimain cmd/apimain.go
+go build -o release/apimain ./cmd
 
 # Copy resource files to the release directory
 cp -ar resources release/
